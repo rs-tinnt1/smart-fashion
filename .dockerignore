@@ -1,0 +1,89 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+.pytest_cache/
+.coverage
+htmlcov/
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Docker (không cần copy các Dockerfile khác vào image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Environment files (sẽ mount từ bên ngoài)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Model files (mount từ volume thay vì copy vào image để giảm size)
+*.pt
+*.pth
+*.onnx
+*.h5
+*.pb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backup files
+*~
+*.swp
+*.swo

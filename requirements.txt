@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+jinja2
+ultralytics
+opencv-python
+numpy
+Pillow
+aiofiles
+python-dotenv
+# Nếu sẽ dùng motor (MongoDB async) hoặc minio client:
+motor
+minio

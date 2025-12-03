@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gallery - Clothing Segmentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 50;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.8);
+      }
+      .modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .modal-content {
+        max-width: 90%;
+        max-height: 90%;
+        object-fit: contain;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <div class="flex items-center">
+            <svg
+              class="w-8 h-8 text-blue-600 mr-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              ></path>
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-800">
+              Fashion AI Segmentation
+            </h1>
+          </div>
+          <div class="flex space-x-4">
+            <a href="/" class="text-gray-600 hover:text-blue-600">Upload</a>
+            <a href="/gallery" class="text-blue-600 font-semibold">Gallery</a>
+            <a
+              href="/docs"
+              target="_blank"
+              class="text-gray-600 hover:text-blue-600"
+              >API Docs</a
+            >
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Header -->
+      <div class="flex justify-between items-center mb-8">
+        <div>
+          <h2 class="text-3xl font-bold text-gray-900">Image Gallery</h2>
+          <p class="text-gray-600 mt-1">Browse all processed images</p>
+        </div>
+        <div class="text-right">
+          <p class="text-2xl font-bold text-blue-600">{{ images|length }}</p>
+          <p class="text-sm text-gray-600">Total Images</p>
+        </div>
+      </div>
+
+      {% if images %}
+      <!-- Gallery Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for image in images %}
+        <div
+          class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition"
+        >
+          <div
+            class="cursor-pointer"
+            onclick="openModal('{{ image.image_url }}')"
+          >
+            <img
+              src="{{ image.image_url }}"
+              alt="Segmentation result"
+              class="w-full h-64 object-cover"
+            />
+          </div>
+          <div class="p-4">
+            <div class="flex justify-between items-start mb-3">
+              <div>
+                <p class="text-sm text-gray-500">{{ image.timestamp }}</p>
+                <p class="font-semibold text-gray-900 mt-1">
+                  {{ image.object_count }} objects detected
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap gap-1 mb-4">
+              {% for cls in image.classes %}
+              <span
+                class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+              >
+                {{ cls }}
+              </span>
+              {% endfor %}
+            </div>
+
+            <div class="flex flex-col space-y-2">
+              <!-- <button onclick="drawWithCanvas('{{ image.file_id }}')" class="w-full bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 transition text-sm font-medium">-->
+              <!-- Draw with Canvas-->
+              <!-- </button>-->
+              <div class="flex justify-between items-center">
+                <div class="flex space-x-2">
+                  <a
+                    href="{{ image.image_url }}"
+                    download
+                    class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    <svg
+                      class="w-5 h-5 inline"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      ></path>
+                    </svg>
+                  </a>
+                  <button
+                    onclick="viewDetails('{{ image.file_id }}')"
+                    class="text-green-600 hover:text-green-800 text-sm font-medium"
+                  >
+                    <svg
+                      class="w-5 h-5 inline"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      ></path>
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  onclick="deleteImage('{{ image.file_id }}')"
+                  class="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  <svg
+                    class="w-5 h-5 inline"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <!-- Empty State -->
+      <div class="text-center py-16">
+        <svg
+          class="w-24 h-24 mx-auto text-gray-400 mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+          ></path>
+        </svg>
+        <h3 class="text-2xl font-semibold text-gray-700 mb-2">No Images Yet</h3>
+        <p class="text-gray-500 mb-6">Upload your first image to get started</p>
+        <a
+          href="/"
+          class="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+        >
+          Upload Images
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+      <span
+        onclick="closeModal()"
+        class="absolute top-4 right-4 text-white text-4xl cursor-pointer hover:text-gray-300"
+        >&times;</span
+      >
+      <img id="modalImage" class="modal-content" />
+    </div>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+      <div
+        class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
+      >
+        <div class="p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-900">
+              Segmentation Details
+            </h3>
+            <button
+              onclick="closeDetailsModal()"
+              class="text-gray-500 hover:text-gray-700"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+            </button>
+          </div>
+          <div id="detailsContent"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas Modal -->
+    <div
+      id="canvasModal"
+      class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+      >
+        <div class="p-4 border-b flex justify-between items-center">
+          <h3 class="text-xl font-bold text-gray-900">Canvas Editor</h3>
+          <div class="flex space-x-2">
+            <button
+              onclick="downloadCanvas()"
+              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition text-sm"
+            >
+              Download Canvas
+            </button>
+            <button
+              onclick="closeCanvasModal()"
+              class="text-gray-500 hover:text-gray-700"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-auto p-4">
+          <div class="flex space-x-4">
+            <div class="flex-1">
+              <canvas
+                id="drawCanvas"
+                class="border border-gray-300 max-w-full"
+              ></canvas>
+            </div>
+            <div
+              class="w-64 bg-gray-50 p-4 rounded overflow-y-auto max-h-[calc(90vh-120px)]"
+            >
+              <h4 class="font-semibold mb-3">Detected Objects</h4>
+              <div id="canvasObjectsList" class="space-y-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script defer src="/static/gallery.js"></script>
+  </body>
+</html>
