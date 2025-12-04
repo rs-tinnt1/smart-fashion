@@ -1,13 +1,21 @@
+# Web Framework
 fastapi
 uvicorn[standard]
 python-multipart
 jinja2
-ultralytics
-opencv-python
+
+# ONNX Runtime
+onnxruntime>=1.17.0
+
+# CV Libraries
+opencv-python-headless
 numpy
 Pillow
+
+# Utils
 aiofiles
 python-dotenv
-# Nếu sẽ dùng motor (MongoDB async) hoặc minio client:
+
+# Database
 motor
 minio

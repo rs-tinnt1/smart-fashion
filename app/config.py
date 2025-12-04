@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL_PATH = 'deepfashion2_yolov8s-seg.pt'
+# Model paths
+ONNX_MODEL_PATH = os.getenv("ONNX_MODEL_PATH", "models/deepfashion2_yolov8s-seg.onnx")
+
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("outputs")
 STATIC_DIR = Path("static")

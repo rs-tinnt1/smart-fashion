@@ -5,7 +5,6 @@ import shutil
 import json
 from typing import List, Dict, Any
 
-from ultralytics import YOLO
 import cv2
 import numpy as np
 
@@ -27,7 +26,7 @@ def _delete_input(input_path: Path):
         input_path.unlink()
 
 
-def _process_one_image(image_path: str, output_prefix: str, model: YOLO) -> Dict[str, Any]:
+def _process_one_image(image_path: str, output_prefix: str, model: Any) -> Dict[str, Any]:
     """Exact copy of your original process_image() – unchanged."""
     image = cv2.imread(image_path)
     if image is None:
@@ -122,7 +121,7 @@ def _process_one_image(image_path: str, output_prefix: str, model: YOLO) -> Dict
     }
 
 
-def segment_one_file(file_obj, model: YOLO) -> Dict[str, Any]:
+def segment_one_file(file_obj, model: Any, base_url: str = "") -> Dict[str, Any]:
     """Handle a single uploaded file – called from the /segment endpoint."""
     if not file_obj.content_type.startswith("image/"):
         raise ValueError(f"File {file_obj.filename} is not an image")
@@ -136,8 +135,8 @@ def segment_one_file(file_obj, model: YOLO) -> Dict[str, Any]:
             "filename": file_obj.filename,
             "file_id": file_id,
             "segmentation_data": result["json_data"],
-            "output_image_url": f"/outputs/{file_id}_output.jpg",
-            "json_url": f"/outputs/{file_id}_data.json"
+            "output_image_url": f"{base_url}/outputs/{file_id}_output.jpg",
+            "json_url": f"{base_url}/outputs/{file_id}_data.json"
         }
     finally:
         _delete_input(input_path)

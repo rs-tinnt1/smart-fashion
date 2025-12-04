@@ -151,12 +151,16 @@
         body: formData,
       });
 
+      console.log("TEST 1 :", response);
+
       if (!response.ok) {
         throw new Error("Processing failed");
       }
 
       const results = await response.json();
-      displayResults(results);
+      console.log("TEST 2 :", results.results);
+      console.log("TEST 3 :", results.results.length);
+      displayResults(results.results);
     } catch (error) {
       console.error("Error processing images:", error);
       alert("Failed to process images. Please try again.");
@@ -189,8 +193,8 @@
 
     card.innerHTML = `
             <img src="${
-              result.image_url
-            }" alt="Segmented image" class="w-full h-64 object-cover">
+              result.output_image_url
+            }" alt="Segmented image" class="w-full h-64 object-contain">
             <div class="p-4">
                 <div class="flex justify-between items-center mb-3">
                     <span class="text-sm font-semibold text-gray-900">${objectsDetected} objects detected</span>
@@ -216,7 +220,7 @@
                             class="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium">
                         Edit in Canvas
                     </button>
-                    <a href="${result.image_url}" download 
+                    <a href="${result.output_image_url}" download 
                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium text-center">
                         Download
                     </a>

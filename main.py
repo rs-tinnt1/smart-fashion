@@ -1,11 +1,9 @@
-# main.py  (your original file, trimmed)
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
-from ultralytics import YOLO
-from app.config import UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR, MODEL_PATH
+from app.config import UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR, ONNX_MODEL_PATH
 from app.controllers.api_controller import router as api_router
 from app.controllers.gallery_controller import router as gallery_router
 
@@ -33,15 +31,21 @@ app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 templates = Jinja2Templates(directory="templates")
 
-# MODEL loading
+# MODEL loading - ONNX Runtime
 model = None
+
 @app.on_event("startup")
 async def load_model():
     global model
     try:
-        model = YOLO(MODEL_PATH)
-        print(f"Model loaded successfully from {MODEL_PATH}")
-        # inject vào controller (giản lược)
+        # Use ONNX Runtime for inference
+        from app.services.onnx_inference import ONNXYOLOSegmentation
+        model_path = ONNX_MODEL_PATH
+        print(f"Loading ONNX model from {model_path}")
+        model = ONNXYOLOSegmentation(model_path)
+        print(f"ONNX model loaded successfully")
+        
+        # Inject model into controller
         import app.controllers.api_controller
         app.controllers.api_controller.model = model
     except Exception as e:

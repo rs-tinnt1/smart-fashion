@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
 from app.services.api import segment_one_file, delete_output, get_stats
 from typing import List
 from datetime import datetime
@@ -22,13 +22,14 @@ async def health_check():
     }
 
 @router.post("/api/segment")
-async def segment_clothing(files: List[UploadFile] = File(...), yolo_model=Depends(get_model)):
+async def segment_clothing(request: Request, files: List[UploadFile] = File(...), yolo_model=Depends(get_model)):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
+    base_url = str(request.base_url).rstrip("/")
     results = []
     for file in files:
         try:
-            result = segment_one_file(file, yolo_model)
+            result = segment_one_file(file, yolo_model, base_url)
             results.append(result)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error processing {file.filename}: {str(e)}")
