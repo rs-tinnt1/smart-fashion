@@ -98,3 +98,22 @@ __pypackages__/
 # Ignore static collected files (optional)
 staticfiles/
 media/
+
+# Temp folders
+temp_models/
+temp/
+
+# Test files and outputs
+inputs/
+outputs/
+test_*.py
+test_*.json
+*_report*.json
+*_result*.txt
+
+# Analysis scripts (temporary)
+analyze_*.py
+compare_*.py
+summarize*.py
+check_*.py
+export_*.py

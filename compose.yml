@@ -5,10 +5,6 @@ services:
     restart: unless-stopped
     ports:
       - "${UVICORN_PORT:-8000}:8000"
-    volumes:
-    volumes:
-      # Mount ONNX model
-      - ./models/deepfashion2_yolov8s-seg.onnx:/app/models/deepfashion2_yolov8s-seg.onnx:ro
     env_file:
       - .env
     environment:
@@ -16,7 +12,7 @@ services:
       - UVICORN_HOST=${UVICORN_HOST:-0.0.0.0}
       - UVICORN_PORT=${UVICORN_PORT:-8000}
       - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
-      - ONNX_MODEL_PATH=/app/models/deepfashion2_yolov8s-seg.onnx
+      - MINIO_MODEL_KEY=${MINIO_MODEL_KEY:-deepfashion2_yolov8s-seg.onnx}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
       - MONGO_URI=${MONGO_URI}
       - MONGO_DB=${MONGO_DB}

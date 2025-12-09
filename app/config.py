@@ -6,6 +6,8 @@ load_dotenv()
 
 # Model paths
 ONNX_MODEL_PATH = os.getenv("ONNX_MODEL_PATH", "models/deepfashion2_yolov8s-seg.onnx")
+MINIO_MODEL_KEY = os.getenv("MINIO_MODEL_KEY", "deepfashion2_yolov8s-seg.onnx")
+LOCAL_MODEL_CACHE = Path(os.getenv("LOCAL_MODEL_CACHE", "/tmp/models"))
 
 UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("outputs")

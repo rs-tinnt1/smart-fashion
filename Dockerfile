@@ -40,7 +40,6 @@ ENV PYTHONUNBUFFERED=1 \
     UVICORN_PORT=8000 \
     UVICORN_WORKERS=1 \
     PATH=/home/appuser/.local/bin:$PATH \
-    ONNX_MODEL_PATH=/app/models/deepfashion2_yolov8s-seg.onnx \
     OMP_NUM_THREADS=4
 
 USER appuser

@@ -2,6 +2,7 @@
 ONNX Runtime Inference Service for YOLOv8 Segmentation
 
 This module provides ONNX Runtime-based inference that matches the ultralytics API output format.
+Enhanced with letterbox preprocessing for improved accuracy.
 """
 
 import cv2
@@ -103,6 +104,7 @@ class ONNXYOLOSegmentation:
     ONNX Runtime inference class for YOLOv8 Segmentation models.
     
     Provides same interface as ultralytics.YOLO for easier drop-in replacement.
+    Enhanced with letterbox preprocessing for improved accuracy.
     """
     
     # DeepFashion2 class names (13 classes)
@@ -183,26 +185,94 @@ class ONNXYOLOSegmentation:
         """
         orig_h, orig_w = image.shape[:2]
         
-        # Preprocess
-        input_tensor = self._preprocess(image)
+        # Preprocess with letterbox (preserves aspect ratio)
+        input_tensor, scale, pad = self._preprocess(image)
         
         # Inference
         outputs = self.session.run(self.output_names, {self.input_name: input_tensor})
         
-        # Post-process
+        # Post-process (pass scale and pad for coordinate adjustment)
         result = self._postprocess(
             outputs,
             orig_shape=(orig_h, orig_w),
             conf_threshold=conf,
-            iou_threshold=iou
+            iou_threshold=iou,
+            scale=scale,
+            pad=pad
         )
         
         return [result]
     
-    def _preprocess(self, image: np.ndarray) -> np.ndarray:
-        """Preprocess image for YOLO inference."""
-        # Resize to model input size
-        img = cv2.resize(image, (self.img_size, self.img_size))
+    def _letterbox(
+        self,
+        image: np.ndarray,
+        new_shape: int = 640,
+        color: Tuple[int, int, int] = (114, 114, 114),
+        auto: bool = False,
+        scaleFill: bool = False,
+        scaleup: bool = True,
+        stride: int = 32
+    ) -> Tuple[np.ndarray, float, Tuple[float, float]]:
+        """
+        Resize and pad image while maintaining aspect ratio.
+        
+        This matches the Ultralytics letterbox implementation for consistent results.
+        
+        Args:
+            image: Input image (BGR, HWC)
+            new_shape: Target size
+            color: Padding color (gray by default, matching Ultralytics)
+            auto: Minimum rectangle
+            scaleFill: Stretch to fill
+            scaleup: Allow scaling up
+            stride: Stride for padding alignment
+        
+        Returns:
+            Tuple of (letterboxed image, scale ratio, (dw, dh) padding)
+        """
+        shape = image.shape[:2]  # current shape [height, width]
+        
+        if isinstance(new_shape, int):
+            new_shape = (new_shape, new_shape)
+        
+        # Scale ratio (new / old)
+        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+        if not scaleup:  # only scale down, do not scale up
+            r = min(r, 1.0)
+        
+        # Compute padding
+        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]
+        
+        if auto:  # minimum rectangle
+            dw, dh = np.mod(dw, stride), np.mod(dh, stride)
+        elif scaleFill:  # stretch
+            dw, dh = 0.0, 0.0
+            new_unpad = (new_shape[1], new_shape[0])
+            r = new_shape[1] / shape[1]
+        
+        dw /= 2  # divide padding into 2 sides
+        dh /= 2
+        
+        if shape[::-1] != new_unpad:
+            image = cv2.resize(image, new_unpad, interpolation=cv2.INTER_LINEAR)
+        
+        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+        image = cv2.copyMakeBorder(image, top, bottom, left, right, 
+                                    cv2.BORDER_CONSTANT, value=color)
+        
+        return image, r, (dw, dh)
+    
+    def _preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, float, Tuple[float, float]]:
+        """
+        Preprocess image for YOLO inference with letterbox padding.
+        
+        Returns:
+            Tuple of (input tensor, scale ratio, (dw, dh) padding)
+        """
+        # Apply letterbox to maintain aspect ratio
+        img, scale, pad = self._letterbox(image, self.img_size)
         
         # BGR to RGB
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -216,26 +286,36 @@ class ONNXYOLOSegmentation:
         # Add batch dimension
         img = np.expand_dims(img, axis=0)
         
-        return img
+        return img, scale, pad
     
     def _postprocess(
         self,
         outputs: List[np.ndarray],
         orig_shape: Tuple[int, int],
         conf_threshold: float = 0.25,
-        iou_threshold: float = 0.45
+        iou_threshold: float = 0.45,
+        scale: float = 1.0,
+        pad: Tuple[float, float] = (0, 0)
     ) -> YOLOv8SegmentResult:
         """
         Post-process ONNX outputs to match ultralytics format.
         
         YOLOv8-seg output format:
-        - output0: [1, 116, 8400] - boxes + class scores + mask coefficients
+        - output0: [1, 49, 8400] - boxes + class scores + mask coefficients
         - output1: [1, 32, 160, 160] - prototype masks
+        
+        Args:
+            outputs: ONNX model outputs
+            orig_shape: Original image shape (H, W)
+            conf_threshold: Confidence threshold
+            iou_threshold: IoU threshold for NMS
+            scale: Scale ratio from letterbox
+            pad: Padding (dw, dh) from letterbox
         """
         # Parse outputs based on YOLOv8-seg architecture
         if len(outputs) >= 2:
             # Segmentation model with masks
-            predictions = outputs[0]  # [1, 116, 8400]
+            predictions = outputs[0]  # [1, 49, 8400]
             proto_masks = outputs[1]  # [1, 32, 160, 160]
         else:
             # Detection only
@@ -243,13 +323,13 @@ class ONNXYOLOSegmentation:
             proto_masks = None
         
         # Process detections
-        predictions = predictions[0].T  # [8400, 116]
+        predictions = predictions[0].T  # [8400, 49]
         
         # Extract boxes, scores, and mask coefficients
         # Format: [x, y, w, h, class_scores..., mask_coeffs...]
         boxes = predictions[:, :4]  # [8400, 4] - x, y, w, h
         
-        # Number of classes (116 - 4 - 32 = 80 for COCO, but DeepFashion2 has 13)
+        # Number of classes (49 - 4 - 32 = 13 for DeepFashion2)
         num_mask_coeffs = 32 if proto_masks is not None else 0
         num_classes = predictions.shape[1] - 4 - num_mask_coeffs
         
@@ -280,11 +360,17 @@ class ONNXYOLOSegmentation:
         # Convert xywh to xyxy
         boxes_xyxy = self._xywh_to_xyxy(boxes)
         
-        # Scale boxes to original image size
-        scale_x = orig_shape[1] / self.img_size
-        scale_y = orig_shape[0] / self.img_size
-        boxes_xyxy[:, [0, 2]] *= scale_x
-        boxes_xyxy[:, [1, 3]] *= scale_y
+        # Reverse letterbox transformation to get coordinates in original image space
+        # 1. Remove padding offset
+        boxes_xyxy[:, [0, 2]] -= pad[0]  # x coords
+        boxes_xyxy[:, [1, 3]] -= pad[1]  # y coords
+        
+        # 2. Reverse scale
+        boxes_xyxy /= scale
+        
+        # 3. Clip to original image bounds
+        boxes_xyxy[:, [0, 2]] = np.clip(boxes_xyxy[:, [0, 2]], 0, orig_shape[1])
+        boxes_xyxy[:, [1, 3]] = np.clip(boxes_xyxy[:, [1, 3]], 0, orig_shape[0])
         
         # Apply NMS
         keep_indices = self._nms(boxes_xyxy, confidences, iou_threshold)
@@ -301,7 +387,9 @@ class ONNXYOLOSegmentation:
             masks_data = self._process_masks(
                 proto_masks[0],  # [32, 160, 160]
                 mask_coeffs,      # [N, 32]
-                orig_shape
+                orig_shape,
+                scale,
+                pad
             )
         
         return YOLOv8SegmentResult(
@@ -364,7 +452,9 @@ class ONNXYOLOSegmentation:
         self,
         proto_masks: np.ndarray,
         mask_coeffs: np.ndarray,
-        orig_shape: Tuple[int, int]
+        orig_shape: Tuple[int, int],
+        scale: float = 1.0,
+        pad: Tuple[float, float] = (0, 0)
     ) -> np.ndarray:
         """
         Process prototype masks with coefficients to get instance masks.
@@ -373,9 +463,11 @@ class ONNXYOLOSegmentation:
             proto_masks: [32, H, W] prototype masks
             mask_coeffs: [N, 32] mask coefficients
             orig_shape: Original image shape (H, W)
+            scale: Scale ratio from letterbox
+            pad: Padding (dw, dh) from letterbox
         
         Returns:
-            Instance masks [N, H, W]
+            Instance masks [N, H, W] in original image space
         """
         # Matrix multiplication: [N, 32] @ [32, H*W] -> [N, H*W]
         proto_h, proto_w = proto_masks.shape[1], proto_masks.shape[2]
@@ -387,13 +479,29 @@ class ONNXYOLOSegmentation:
         # Sigmoid activation
         masks = 1 / (1 + np.exp(-masks))
         
-        # Resize masks to original image size
+        # Scale masks back to letterboxed image size
+        letterbox_h = int(self.img_size)
+        letterbox_w = int(self.img_size)
+        
+        # First resize to letterbox size
         resized_masks = []
         for mask in masks:
-            resized = cv2.resize(mask, (orig_shape[1], orig_shape[0]))
+            resized = cv2.resize(mask, (letterbox_w, letterbox_h))
             resized_masks.append(resized)
+        masks = np.array(resized_masks)
         
-        return np.array(resized_masks)
+        # Remove padding from masks
+        pad_w, pad_h = int(pad[0]), int(pad[1])
+        if pad_h > 0 or pad_w > 0:
+            masks = masks[:, pad_h:letterbox_h-pad_h, pad_w:letterbox_w-pad_w]
+        
+        # Resize to original image size
+        final_masks = []
+        for mask in masks:
+            resized = cv2.resize(mask, (orig_shape[1], orig_shape[0]))
+            final_masks.append(resized)
+        
+        return np.array(final_masks)
 
 
 # Convenience function for drop-in replacement

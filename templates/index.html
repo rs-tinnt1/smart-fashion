@@ -96,24 +96,19 @@
             ></path>
           </svg>
           <p class="text-xl text-gray-700 mb-2">Drag & drop images here</p>
-          <p class="text-gray-500 mb-4">or</p>
-          <label
-            for="fileInput"
-            class="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 cursor-pointer transition"
-          >
-            Browse Files
-          </label>
-          <input
-            type="file"
-            id="fileInput"
-            multiple
-            accept="image/*"
-            class="hidden"
-          />
+          <p class="text-gray-500 mb-4">or click anywhere to browse</p>
           <p class="text-sm text-gray-500 mt-4">
             Supports: JPG, PNG, WebP (Multiple files allowed)
           </p>
         </div>
+        <!-- File input moved outside dropZone to prevent double trigger -->
+        <input
+          type="file"
+          id="fileInput"
+          multiple
+          accept="image/*"
+          class="hidden"
+        />
 
         <!-- File Preview -->
         <div id="filePreview" class="mt-6 hidden">
