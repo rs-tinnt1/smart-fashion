@@ -26,7 +26,7 @@ RUN useradd -m -u 1000 appuser
 WORKDIR /app
 
 COPY --from=builder /root/.local /home/appuser/.local
-COPY --chown=appuser:appuser main.py .
+COPY --chown=appuser:appuser main.py worker.py ./
 COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser templates/ ./templates/
 COPY --chown=appuser:appuser static/ ./static/

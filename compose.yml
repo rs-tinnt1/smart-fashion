@@ -14,17 +14,24 @@ services:
       - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
       - MINIO_MODEL_KEY=${MINIO_MODEL_KEY:-deepfashion2_yolov8s-seg.onnx}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
-      - MONGO_URI=${MONGO_URI}
-      - MONGO_DB=${MONGO_DB}
-      - MINIO_ENDPOINT=${MINIO_ENDPOINT}
+      # MariaDB config
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_USER=${DB_USER:-smartfashion}
+      - DB_PASSWORD=${DB_PASSWORD:-smartfashion}
+      - DB_NAME=${DB_NAME:-smartfashion}
+      # MinIO config
+      - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_REGION=${MINIO_REGION}
       - MINIO_SECURE=${MINIO_SECURE}
     depends_on:
-      - mongodb
-      - minio
+      mariadb:
+        condition: service_healthy
+      minio:
+        condition: service_started
     networks:
       - smartfashion-network
     healthcheck:
@@ -40,18 +47,28 @@ services:
       retries: 3
       start_period: 30s
 
-  mongodb:
-    image: mongo:7.0
-    container_name: mongodb
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
     restart: unless-stopped
     environment:
-      - MONGO_INITDB_DATABASE=${MONGO_DB}
+      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
+      - MARIADB_DATABASE=${DB_NAME:-smartfashion}
+      - MARIADB_USER=${DB_USER:-smartfashion}
+      - MARIADB_PASSWORD=${DB_PASSWORD:-smartfashion}
     ports:
-      - "27017:27017"
+      - "3306:3306"
     volumes:
-      - mongodb_data:/data/db
+      - mariadb_data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     networks:
       - smartfashion-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   minio:
     image: minio/minio:latest
@@ -73,5 +90,5 @@ networks:
   smartfashion-network:
 
 volumes:
-  mongodb_data:
+  mariadb_data:
   minio_data:

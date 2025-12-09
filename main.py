@@ -2,42 +2,25 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from pathlib import Path
-from app.config import UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR, ONNX_MODEL_PATH, MINIO_MODEL_KEY, LOCAL_MODEL_CACHE, MINIO_BUCKET
+from app.config import UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR, MINIO_MODEL_KEY, LOCAL_MODEL_CACHE, MINIO_BUCKET
 from app.controllers.api_controller import router as api_router
 from app.controllers.gallery_controller import router as gallery_router
+from app.controllers.upload_controller import router as upload_router
 
-app = FastAPI(
-    title="Clothing Segmentation Web App",
-    description="Web application for detecting and segmenting clothing items in images",
-    version="1.0.0"
-)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
-STATIC_DIR.mkdir(exist_ok=True)
-
-if Path("static").exists():
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
-
-templates = Jinja2Templates(directory="templates")
-
-# MODEL loading - ONNX Runtime
+# Global model and services
 model = None
 minio_service = None
 
-@app.on_event("startup")
-async def load_model():
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown."""
     global model, minio_service
+    
+    # Startup
     try:
         # Initialize MinIO service
         from app.services.minio_service import get_minio_service
@@ -68,18 +51,64 @@ async def load_model():
         
         # Inject model into controller
         app.controllers.api_controller.model = model
+        
+        # Initialize database connection pool
+        from app.services.database import get_database
+        db = await get_database()
+        print("Database connection pool initialized")
+        
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"Error during startup: {e}")
         raise
+    
+    yield  # Application runs here
+    
+    # Shutdown
+    try:
+        from app.services.database import close_database
+        await close_database()
+        print("Database connection pool closed")
+    except Exception as e:
+        print(f"Error during shutdown: {e}")
+
+
+app = FastAPI(
+    title="Clothing Segmentation Web App",
+    description="Web application for detecting and segmenting clothing items in images",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+UPLOAD_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
+STATIC_DIR.mkdir(exist_ok=True)
+
+if Path("static").exists():
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
+
+templates = Jinja2Templates(directory="templates")
+
 
 # Main UI (home)
 @app.get("/", response_class=None)
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+
 # Include routers
 app.include_router(api_router)
 app.include_router(gallery_router)
+app.include_router(upload_router, prefix="/api")
+
 
 if __name__ == "__main__":
     import uvicorn

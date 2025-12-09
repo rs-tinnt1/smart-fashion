@@ -13,9 +13,12 @@ UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("outputs")
 STATIC_DIR = Path("static")
 
-# DB settings
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/smartfashion")
-MONGO_DB = os.getenv("MONGO_DB", "smartfashion")
+# DB settings (MariaDB)
+DB_HOST = os.getenv("DB_HOST", "mariadb")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_USER = os.getenv("DB_USER", "smartfashion")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "smartfashion")
+DB_NAME = os.getenv("DB_NAME", "smartfashion")
 
 # MinIO config
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")

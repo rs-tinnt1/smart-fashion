@@ -55,8 +55,9 @@ def _process_one_image(image_path: str, output_prefix: str, model: Any) -> Dict[
             bbox = boxes_xyxy[i]  # [x1, y1, x2, y2]
             x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
             
-            # Expand bbox slightly (10% each side) to avoid cutting edges
-            bbox_margin = 0.10
+            # Expand bbox slightly (5% each side) to avoid cutting edges
+            # Lower margin = tighter mask, better for multi-person images
+            bbox_margin = 0.05
             bbox_w = x2 - x1
             bbox_h = y2 - y1
             x1 = max(0, int(x1 - bbox_w * bbox_margin))

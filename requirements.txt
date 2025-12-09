@@ -17,5 +17,5 @@ aiofiles
 python-dotenv
 
 # Database
-motor
+aiomysql
 minio
