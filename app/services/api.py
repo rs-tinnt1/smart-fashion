@@ -224,9 +224,9 @@ def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "
         json_key = f"outputs/{file_id}_data.json"
         minio_service.upload_file(json_file_path, json_key, content_type="application/json")
         
-        # Get presigned URLs
-        output_image_url = minio_service.get_presigned_url(output_image_key)
-        json_url = minio_service.get_presigned_url(json_key)
+        # Get public URLs (bucket is set to public download)
+        output_image_url = minio_service.get_public_url(output_image_key)
+        json_url = minio_service.get_public_url(json_key)
         
         # Clean up local output files
         output_image_path.unlink(missing_ok=True)

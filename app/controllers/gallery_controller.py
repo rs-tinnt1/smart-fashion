@@ -57,14 +57,14 @@ async def gallery(
         )
         class_names = [d['label'] for d in detections]
         
-        # Get presigned URL if available
+        # Get public URL if available
         output_url = None
         output_key = f"outputs/{img['id']}_output.jpg"
         if minio.object_exists(output_key):
-            output_url = minio.get_presigned_url(output_key)
+            output_url = minio.get_public_url(output_key)
         else:
             # Fallback to original image
-            output_url = minio.get_presigned_url(img['storage_url'])
+            output_url = minio.get_public_url(img['storage_url'])
         
         images.append({
             "file_id": img['id'],
@@ -107,12 +107,12 @@ async def api_gallery(
             (img['id'],)
         )
         
-        # Get presigned URLs
-        original_url = minio.get_presigned_url(img['storage_url'])
+        # Get public URLs
+        original_url = minio.get_public_url(img['storage_url'])
         output_key = f"outputs/{img['id']}_output.jpg"
         output_url = None
         if minio.object_exists(output_key):
-            output_url = minio.get_presigned_url(output_key)
+            output_url = minio.get_public_url(output_key)
         
         result.append({
             "id": img['id'],

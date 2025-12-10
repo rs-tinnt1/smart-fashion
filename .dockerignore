@@ -1,10 +1,14 @@
+# ===========================================
+# .dockerignore - Optimized for minimal build context
+# ===========================================
+
 # Git
 .git
 .gitignore
 .gitattributes
 .github/
 
-# Python
+# Python cache and bytecode
 __pycache__/
 *.py[cod]
 *$py.class
@@ -14,49 +18,47 @@ __pycache__/
 dist/
 build/
 *.egg
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
-.venv
-env.bak/
-venv.bak/
 
-# IDE
+# IDE and editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.project
-.pydevproject
-.settings/
 
-# Documentation
+# Documentation (except README)
+docs/
 *.md
 !README.md
-docs/
 
-# Tests
+# Tests (not needed in production image)
 tests/
-test_*.py
-*_test.py
 .pytest_cache/
 .coverage
 htmlcov/
+pytest.ini
 
-# CI/CD
+# CI/CD configs
 .gitlab-ci.yml
 .travis.yml
 Jenkinsfile
+.github/
 
-# Docker (không cần copy các Dockerfile khác vào image)
+# Docker files (avoid recursion)
 Dockerfile*
 docker-compose*.yml
+compose*.yml
 .dockerignore
 
-# Environment files (sẽ mount từ bên ngoài)
+# Environment files (mounted at runtime)
 .env
 .env.*
 !.env.example
@@ -65,12 +67,18 @@ docker-compose*.yml
 *.log
 logs/
 
-# Model files (mount từ volume thay vì copy vào image để giảm size)
+# Model files (mounted via volume)
 *.pt
 *.pth
 *.onnx
 *.h5
 *.pb
+models/
+
+# Data directories (mounted via volume)
+inputs/
+outputs/
+uploads/
 
 # Temporary files
 tmp/
@@ -83,7 +91,7 @@ temp/
 Thumbs.db
 desktop.ini
 
-# Backup files
-*~
-*.swp
-*.swo
+# Development files
+Makefile
+*.sh
+!docker-entrypoint.sh

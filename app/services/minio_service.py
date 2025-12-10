@@ -18,6 +18,7 @@ from app.config import (
     MINIO_BUCKET,
     MINIO_REGION,
     MINIO_SECURE,
+    MINIO_EXTERNAL_ENDPOINT,
 )
 
 
@@ -140,10 +141,31 @@ class MinIOService:
                 object_name,
                 expires=timedelta(hours=expires_hours),
             )
+            # Replace internal endpoint with external one for browser access
+            internal_endpoint = MINIO_ENDPOINT.replace("http://", "").replace("https://", "")
+            external_endpoint = MINIO_EXTERNAL_ENDPOINT.replace("http://", "").replace("https://", "")
+            if internal_endpoint != external_endpoint:
+                # Determine protocol from external endpoint
+                protocol = "https://" if MINIO_EXTERNAL_ENDPOINT.startswith("https://") else "http://"
+                url = url.replace(f"http://{internal_endpoint}", f"{protocol}{external_endpoint}")
+                url = url.replace(f"https://{internal_endpoint}", f"{protocol}{external_endpoint}")
             return url
         except S3Error as e:
             print(f"Error generating presigned URL: {e}")
             return None
+    
+    def get_public_url(
+        self,
+        object_name: str,
+        bucket_name: Optional[str] = None,
+    ) -> str:
+        """
+        Get a direct public URL for accessing an object.
+        Use this for public buckets where presigned signatures are not needed.
+        """
+        bucket = bucket_name or self.default_bucket
+        # Use external endpoint for browser access
+        return f"{MINIO_EXTERNAL_ENDPOINT}/{bucket}/{object_name}"
     
     def object_exists(
         self,

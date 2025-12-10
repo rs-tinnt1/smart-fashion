@@ -59,6 +59,15 @@ async def upload_image(
     content = await file.read()
     file_size = len(content)
     
+    # Validate file size (max 500KB)
+    MAX_FILE_SIZE_KB = 500
+    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_KB * 1024
+    if file_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"File size ({file_size // 1024}KB) exceeds maximum allowed ({MAX_FILE_SIZE_KB}KB)"
+        )
+    
     # Calculate hash
     file_hash = hashlib.sha256(content).hexdigest()[:32]
     

@@ -106,8 +106,8 @@ temp/
 # Test files and outputs
 inputs/
 outputs/
-test_*.py
-test_*.json
+/test_*.py
+/test_*.json
 *_report*.json
 *_result*.txt
 

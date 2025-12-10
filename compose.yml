@@ -1,7 +1,13 @@
+# ===========================================
+# Docker Compose - Development Configuration
+# Usage: podman-compose up -d
+# ===========================================
+
 services:
   app:
     build: .
-    container_name: smartfashion
+    container_name: smartfashion-dev
+    image: smartfashion:1.1
     restart: unless-stopped
     ports:
       - "${UVICORN_PORT:-8000}:8000"
@@ -9,24 +15,25 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - UVICORN_HOST=${UVICORN_HOST:-0.0.0.0}
+      - UVICORN_HOST=0.0.0.0
       - UVICORN_PORT=${UVICORN_PORT:-8000}
-      - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
+      - UVICORN_WORKERS=1
       - MINIO_MODEL_KEY=${MINIO_MODEL_KEY:-deepfashion2_yolov8s-seg.onnx}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
-      # MariaDB config
+      # Database
       - DB_HOST=mariadb
       - DB_PORT=3306
       - DB_USER=${DB_USER:-smartfashion}
       - DB_PASSWORD=${DB_PASSWORD:-smartfashion}
       - DB_NAME=${DB_NAME:-smartfashion}
-      # MinIO config
+      # MinIO
       - MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://minio:9000}
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=${MINIO_BUCKET}
       - MINIO_REGION=${MINIO_REGION}
-      - MINIO_SECURE=${MINIO_SECURE}
+      - MINIO_SECURE=${MINIO_SECURE:-false}
+      - MINIO_EXTERNAL_ENDPOINT=${MINIO_EXTERNAL_ENDPOINT:-http://localhost:9000}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -80,6 +87,8 @@ services:
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_SERVER_URL=http://localhost:9000
+      - MINIO_BROWSER_REDIRECT_URL=http://localhost:9001
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"

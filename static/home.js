@@ -4,12 +4,16 @@
 (function () {
   "use strict";
 
-  // DOM Elements
   let dropZone, fileInput, filePreview, fileList, processBtn, loading;
   let resultsSection, resultsContainer;
   let canvasModal, drawCanvas, objectsList;
   let selectedFiles = [];
   let currentCanvasData = null;
+
+  // File upload limits
+  const MAX_FILES = 100;
+  const MAX_FILE_SIZE_KB = 500;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_KB * 1024;
 
   // Initialize on DOM ready
   document.addEventListener("DOMContentLoaded", function () {
@@ -54,8 +58,14 @@
   function handleFileSelect(e) {
     const files = Array.from(e.target.files);
     if (files.length > 0) {
-      selectedFiles = files;
-      displayFilePreview();
+      const validated = validateFiles(files);
+      if (validated.valid.length > 0) {
+        selectedFiles = validated.valid;
+        displayFilePreview();
+      }
+      if (validated.errors.length > 0) {
+        showValidationErrors(validated.errors);
+      }
     }
   }
 
@@ -81,10 +91,47 @@
     );
 
     if (files.length > 0) {
-      selectedFiles = files;
-      fileInput.files = e.dataTransfer.files;
-      displayFilePreview();
+      const validated = validateFiles(files);
+      if (validated.valid.length > 0) {
+        selectedFiles = validated.valid;
+        fileInput.files = e.dataTransfer.files;
+        displayFilePreview();
+      }
+      if (validated.errors.length > 0) {
+        showValidationErrors(validated.errors);
+      }
     }
+  }
+
+  function validateFiles(files) {
+    const result = { valid: [], errors: [] };
+
+    // Check max files
+    if (files.length > MAX_FILES) {
+      result.errors.push(
+        `Maximum ${MAX_FILES} files allowed. You selected ${files.length} files.`
+      );
+      files = files.slice(0, MAX_FILES);
+    }
+
+    files.forEach((file) => {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        result.errors.push(
+          `${file.name}: File size ${formatFileSize(
+            file.size
+          )} exceeds ${MAX_FILE_SIZE_KB}KB limit`
+        );
+      } else {
+        result.valid.push(file);
+      }
+    });
+
+    return result;
+  }
+
+  function showValidationErrors(errors) {
+    const errorHtml = errors.map((e) => `• ${e}`).join("\n");
+    alert(`Upload Validation Errors:\n\n${errorHtml}`);
   }
 
   function displayFilePreview() {
