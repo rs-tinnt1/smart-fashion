@@ -79,14 +79,14 @@ async def segment_clothing(
             objects = segmentation_data.get("objects", [])
             
             # Create image record in database
-            # Use output image URL as storage_url
-            storage_key = f"outputs/{image_id}_output.jpg"
+            # Use original image key (not output image)
+            storage_key = result.get("original_image_key", f"images/{image_id}.jpg")
             await db.create_image(
                 image_id=image_id,
                 storage_url=storage_key,
                 width=segmentation_data.get("image_width", 0),
                 height=segmentation_data.get("image_height", 0),
-                file_size=0,
+                file_size=file_size,
                 hash=None
             )
             
