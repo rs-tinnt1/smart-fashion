@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
+
 # Model paths
 ONNX_MODEL_PATH = os.getenv("ONNX_MODEL_PATH", "models/deepfashion2_yolov8s-seg.onnx")
 MINIO_MODEL_KEY = os.getenv("MINIO_MODEL_KEY", "deepfashion2_yolov8s-seg.onnx")

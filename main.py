@@ -95,7 +95,10 @@ if Path("static").exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
+from app.config import APP_VERSION
+
 templates = Jinja2Templates(directory="templates")
+templates.env.globals.update(APP_VERSION=APP_VERSION)
 
 
 # Main UI (home)

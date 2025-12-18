@@ -99,7 +99,7 @@ async def gallery(
         class_names = [d['label'] for d in detections]
         
         # Use original image URL (not output)
-        original_url = minio.get_public_url(img['storage_url'])
+        original_url = minio.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
         
         images.append({
             "file_id": img['id'],
@@ -175,7 +175,7 @@ async def product_detail(
         detections_data.append(detection)
     
     # Get original image URL (not output)
-    original_url = minio.get_public_url(image['storage_url'])
+    original_url = minio.get_public_url(image['storage_url'], request_host=request.headers.get('host'))
     
     return templates.TemplateResponse("product-detail.html", {
         "request": request,
@@ -193,6 +193,7 @@ async def product_detail(
 
 @router.get("/api/gallery")
 async def api_gallery(
+    request: Request,
     db: DatabaseService = Depends(get_db),
     minio = Depends(get_minio),
     limit: int = 50
@@ -222,11 +223,11 @@ async def api_gallery(
         )
         
         # Get public URLs
-        original_url = minio.get_public_url(img['storage_url'])
+        original_url = minio.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
         output_key = f"outputs/{img['id']}_output.jpg"
         output_url = None
         if minio.object_exists(output_key):
-            output_url = minio.get_public_url(output_key)
+            output_url = minio.get_public_url(output_key, request_host=request.headers.get('host'))
         
         result.append({
             "id": img['id'],

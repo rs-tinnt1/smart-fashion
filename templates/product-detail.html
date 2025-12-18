@@ -146,21 +146,38 @@
               />
             </div>
 
-            <!-- Toggle Mask Checkbox -->
+            <!-- Display Mode Radio Buttons -->
             <div
-              class="flex items-center justify-center space-x-2 bg-white p-3 rounded-lg shadow"
+              class="flex items-center justify-center space-x-6 bg-white p-3 rounded-lg shadow"
             >
-              <input
-                type="checkbox"
-                id="toggleMask"
-                checked
-                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <label
-                for="toggleMask"
-                class="text-sm font-medium text-gray-700 cursor-pointer"
-              >
-                Show Detection Masks
+              <span class="text-sm font-medium text-gray-700">Display Mode:</span>
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="image"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                />
+                <span class="ml-2 text-sm text-gray-700">Image</span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="polygon"
+                  checked
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                />
+                <span class="ml-2 text-sm text-gray-700">Polygon</span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="rectangle"
+                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                />
+                <span class="ml-2 text-sm text-gray-700">Rectangle</span>
               </label>
             </div>
 
@@ -272,6 +289,6 @@
     <div id="fileId" class="hidden">{{ file_id }}</div>
     <div id="originalUrl" class="hidden">{{ original_url }}</div>
 
-    <script defer src="/static/product-detail.js"></script>
+    <script defer src="/static/product-detail.js?v={{ APP_VERSION }}"></script>
   </body>
 </html>

@@ -158,13 +158,30 @@ class MinIOService:
         self,
         object_name: str,
         bucket_name: Optional[str] = None,
+        request_host: Optional[str] = None,
     ) -> str:
         """
         Get a direct public URL for accessing an object.
         Use this for public buckets where presigned signatures are not needed.
+        
+        Args:
+            object_name: Object key in MinIO
+            bucket_name: Optional bucket (defaults to configured bucket)
+            request_host: Optional host from request header for dynamic URL.
+                         If provided, URL will use this host instead of MINIO_EXTERNAL_ENDPOINT.
+                         Format: "hostname:port" or just "hostname"
         """
         bucket = bucket_name or self.default_bucket
-        # Use external endpoint for browser access
+        
+        if request_host:
+            # Use request host for dynamic URL (enables network access)
+            # Determine protocol from external endpoint config
+            protocol = "https://" if MINIO_EXTERNAL_ENDPOINT.startswith("https://") else "http://"
+            # Extract just the host part (without port) and use MinIO port
+            host_only = request_host.split(':')[0]
+            return f"{protocol}{host_only}:9000/{bucket}/{object_name}"
+        
+        # Fallback to configured external endpoint
         return f"{MINIO_EXTERNAL_ENDPOINT}/{bucket}/{object_name}"
     
     def object_exists(

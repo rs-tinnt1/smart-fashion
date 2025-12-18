@@ -161,8 +161,16 @@ def _process_one_image(image_path: str, output_prefix: str, model: Any) -> Dict[
     }
 
 
-def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "") -> Dict[str, Any]:
-    """Handle a single uploaded file – uploads ORIGINAL image to MinIO."""
+def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "", request_host: str = None) -> Dict[str, Any]:
+    """Handle a single uploaded file – uploads ORIGINAL image to MinIO.
+    
+    Args:
+        file_obj: Uploaded file object
+        model: YOLO model for inference
+        minio_service: MinIO service instance
+        base_url: Base URL of the application
+        request_host: Request host header for dynamic MinIO URLs
+    """
     if not file_obj.content_type.startswith("image/"):
         raise ValueError(f"File {file_obj.filename} is not an image")
 
@@ -183,8 +191,8 @@ def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "
         minio_service.upload_file(json_file_path, json_key, content_type="application/json")
         
         # Get public URLs
-        original_image_url = minio_service.get_public_url(original_image_key)
-        json_url = minio_service.get_public_url(json_key)
+        original_image_url = minio_service.get_public_url(original_image_key, request_host=request_host)
+        json_url = minio_service.get_public_url(json_key, request_host=request_host)
         
         # Clean up local files
         json_file_path.unlink(missing_ok=True)

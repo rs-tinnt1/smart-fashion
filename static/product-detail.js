@@ -61,13 +61,13 @@
   }
 
   function setupEventListeners() {
-    // Toggle mask checkbox
-    const toggleMask = document.getElementById("toggleMask");
-    if (toggleMask) {
-      toggleMask.addEventListener("change", function () {
+    // Display mode radio buttons
+    const radioButtons = document.querySelectorAll('input[name="displayMode"]');
+    radioButtons.forEach((radio) => {
+      radio.addEventListener("change", function () {
         drawCanvas();
       });
-    }
+    });
 
     // Download button
     const downloadBtn = document.getElementById("downloadBtn");
@@ -76,24 +76,33 @@
     }
   }
 
+  function getDisplayMode() {
+    const selected = document.querySelector('input[name="displayMode"]:checked');
+    return selected ? selected.value : "polygon";
+  }
+
   function drawCanvas() {
     if (!ctx || !originalImage) return;
 
-    const showMask = document.getElementById("toggleMask")?.checked ?? true;
+    const displayMode = getDisplayMode();
 
     // Clear canvas and draw original image
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(originalImage, 0, 0);
 
-    // Draw masks if enabled
-    if (showMask && detectionsData.length > 0) {
+    // Draw overlays based on mode
+    if (displayMode !== "image" && detectionsData.length > 0) {
       detectionsData.forEach((detection) => {
-        drawDetectionMask(detection);
+        if (displayMode === "polygon") {
+          drawDetectionPolygon(detection);
+        } else if (displayMode === "rectangle") {
+          drawDetectionRectangle(detection);
+        }
       });
     }
   }
 
-  function drawDetectionMask(detection) {
+  function drawDetectionPolygon(detection) {
     if (!detection.polygon || !detection.polygon.points_json) return;
 
     const color = TAG_COLORS[detection.label] || "#999999";
@@ -117,13 +126,39 @@
         drawPolygon(contour, color);
       });
     }
+
+    // Draw label
+    drawLabel(detection, color);
+  }
+
+  function drawDetectionRectangle(detection) {
+    // Use bbox data from detection
+    const bbox = detection.bbox;
+    if (!bbox) return;
+
+    const color = TAG_COLORS[detection.label] || "#999999";
+    const { x, y, w, h } = bbox;
+
+    // Set fill style with transparency
+    ctx.fillStyle = color + "40"; // 25% transparency for rectangle
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+
+    // Draw filled rectangle
+    ctx.fillRect(x, y, w, h);
+
+    // Draw border
+    ctx.strokeRect(x, y, w, h);
+
+    // Draw label at top of rectangle
+    drawLabelAtPosition(detection.label, detection.confidence, x, y, color);
   }
 
   function drawPolygon(contour, color) {
     if (!contour || contour.length === 0) return;
 
     // Set fill style with transparency
-    ctx.fillStyle = color + "80"; // 50% transparency
+    ctx.fillStyle = color + "60"; // 38% transparency
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
 
@@ -139,13 +174,73 @@
     ctx.stroke();
   }
 
-  function downloadImage() {
-    const showMask = document.getElementById("toggleMask")?.checked ?? true;
+  function drawLabel(detection, color) {
+    if (!detection.polygon || !detection.polygon.points_json) return;
 
-    if (showMask) {
-      // Download canvas with mask as PNG
+    let points;
+    if (typeof detection.polygon.points_json === "string") {
+      try {
+        points = JSON.parse(detection.polygon.points_json);
+      } catch (e) {
+        return;
+      }
+    } else {
+      points = detection.polygon.points_json;
+    }
+
+    // Find top-left point from first contour
+    if (points && points.length > 0 && points[0].length > 0) {
+      const firstContour = points[0];
+      let minY = Infinity;
+      let labelX = 0;
+      let labelY = 0;
+
+      firstContour.forEach((point) => {
+        if (point.y < minY) {
+          minY = point.y;
+          labelX = point.x;
+          labelY = point.y;
+        }
+      });
+
+      drawLabelAtPosition(detection.label, detection.confidence, labelX, labelY, color);
+    }
+  }
+
+  function drawLabelAtPosition(label, confidence, x, y, color) {
+    const text = `${label} ${(confidence * 100).toFixed(0)}%`;
+    
+    ctx.font = "bold 14px Arial";
+    const textMetrics = ctx.measureText(text);
+    const textWidth = textMetrics.width;
+    const textHeight = 18;
+    const padding = 4;
+
+    // Adjust position to stay within canvas
+    const labelX = Math.max(0, Math.min(x, canvas.width - textWidth - padding * 2));
+    const labelY = Math.max(textHeight + padding * 2, y - 5);
+
+    // Draw background
+    ctx.fillStyle = color;
+    ctx.fillRect(
+      labelX,
+      labelY - textHeight - padding,
+      textWidth + padding * 2,
+      textHeight + padding
+    );
+
+    // Draw text
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(text, labelX + padding, labelY - padding - 2);
+  }
+
+  function downloadImage() {
+    const displayMode = getDisplayMode();
+
+    if (displayMode !== "image") {
+      // Download canvas with overlay as PNG
       const link = document.createElement("a");
-      link.download = `product-${fileId}-with-mask.png`;
+      link.download = `product-${fileId}-${displayMode}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } else {
@@ -160,6 +255,7 @@
   // Expose for debugging
   window.ProductDetail = {
     drawCanvas,
+    getDisplayMode,
     TAG_COLORS,
   };
 })();

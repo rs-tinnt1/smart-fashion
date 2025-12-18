@@ -71,7 +71,7 @@ async def segment_clothing(
             await file.seek(0)
             
             # Process image with ONNX model
-            result = segment_one_file(file, yolo_model, minio, base_url)
+            result = segment_one_file(file, yolo_model, minio, base_url, request_host=request.headers.get('host'))
             
             # Save to database
             image_id = result["file_id"]
