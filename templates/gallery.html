@@ -3,452 +3,333 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gallery - Clothing Segmentation</title>
+    <title>Gallery — Fashion AI Segmentation</title>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Scandinavian Design System -->
+    <link rel="stylesheet" href="/static/scandinavian.css?v={{ APP_VERSION }}" />
+
+    <!-- Fonts: Newsreader + Manrope -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@300;400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
-      .modal {
-        display: none;
+      /* Match home page styling */
+      body {
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
+        color: #2E2E2E;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Newsreader', Georgia, serif;
+        letter-spacing: -0.02em;
+      }
+
+      /* Subtle noise texture */
+      body::before {
+        content: '';
         position: fixed;
-        z-index: 50;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.8);
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1;
       }
-      .modal.active {
-        display: flex;
-        align-items: center;
-        justify-content: center;
+
+      nav, main {
+        position: relative;
+        z-index: 2;
       }
-      .modal-content {
-        max-width: 90%;
-        max-height: 90%;
-        object-fit: contain;
+
+      .accent-line {
+        width: 80px;
+        height: 3px;
+        background: linear-gradient(90deg, #6B8E9E, #9CAF88);
+        border-radius: 2px;
       }
+
+      /* Animations */
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .fade-in-up {
+        animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0;
+      }
+
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+
+      /* Custom utilities */
+      .text-charcoal { color: #2E2E2E; }
+      .text-fog { color: #9E9E9E; }
+      .text-dusty-blue { color: #6B8E9E; }
+      .bg-pearl { background-color: #FAFAFA; }
+      .border-light { border-color: #E8E8E8; }
     </style>
   </head>
-  <body class="bg-gray-50">
+
+  <body class="overflow-x-hidden">
     <!-- Navigation -->
-    <nav class="bg-white shadow-md">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <svg
-              class="w-8 h-8 text-blue-600 mr-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              ></path>
-            </svg>
-            <h1 class="text-2xl font-bold text-gray-800">
-              Fashion AI Segmentation
-            </h1>
+    <nav class="scandi-nav fixed w-full top-0 z-50">
+      <div class="container mx-auto px-6 lg:px-12 max-w-7xl">
+        <div class="flex justify-between items-center h-24">
+          <div class="scandi-nav__logo fade-in-up" style="font-weight: 500; font-size: 0.9rem;">
+            FASHION AI
           </div>
-          <div class="flex space-x-4">
-            <a href="/" class="text-gray-600 hover:text-blue-600">Upload</a>
-            <a href="/gallery" class="text-blue-600 font-semibold">Gallery</a>
-            <a
-              href="/docs"
-              target="_blank"
-              class="text-gray-600 hover:text-blue-600"
-              >API Docs</a
-            >
+          <div class="flex gap-10 fade-in-up delay-100">
+            <a href="/" class="scandi-nav__link">Upload</a>
+            <a href="/gallery" class="scandi-nav__link scandi-nav__link--active">Gallery</a>
+            <a href="/docs" target="_blank" class="scandi-nav__link">Docs</a>
           </div>
         </div>
       </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Header -->
-      <div class="flex justify-between items-center mb-6">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Image Gallery</h2>
-          <p class="text-gray-600 mt-1">Browse all processed images</p>
-        </div>
-        <div class="text-right">
-          <p class="text-2xl font-bold text-blue-600">{{ total_count }}</p>
-          <p class="text-sm text-gray-600">Total Images</p>
-        </div>
-      </div>
-
-      <!-- Search Bar -->
-      <div class="mb-6 bg-white rounded-lg shadow-md p-4">
-        <form method="get" action="/gallery" class="flex gap-3">
-          <div class="flex-1 relative">
-            <input
-              type="text"
-              name="tag"
-              id="tagSearch"
-              value="{{ current_tag or '' }}"
-              placeholder="Search by tag (e.g., shirt, dress, pants...)"
-              list="tagSuggestions"
-              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <datalist id="tagSuggestions">
-              <option value="short sleeve top"></option>
-              <option value="long sleeve top"></option>
-              <option value="short sleeve outwear"></option>
-              <option value="long sleeve outwear"></option>
-              <option value="vest"></option>
-              <option value="sling"></option>
-              <option value="shorts"></option>
-              <option value="trousers"></option>
-              <option value="skirt"></option>
-              <option value="short sleeve dress"></option>
-              <option value="long sleeve dress"></option>
-              <option value="vest dress"></option>
-              <option value="sling dress"></option>
-            </datalist>
+    <main class="pt-24">
+      <!-- Header Section -->
+      <section class="container mx-auto px-6 lg:px-12 max-w-7xl py-16 lg:py-20">
+        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 fade-in-up">
+          <div>
+            <div class="accent-line mb-6"></div>
+            <h1 class="text-4xl lg:text-6xl font-light mb-3 text-charcoal">
+              Image <span class="text-dusty-blue font-normal">Gallery</span>
+            </h1>
+            <p class="text-fog text-lg font-light">Browse all processed fashion images</p>
           </div>
-          <button
-            type="submit"
-            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-          >
-            <svg
-              class="w-5 h-5 inline mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              ></path>
-            </svg>
-            Search
-          </button>
-          {% if current_tag %}
-          <a
-            href="/gallery"
-            class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium"
-          >
-            Clear
-          </a>
-          {% endif %}
-        </form>
-        {% if current_tag %}
-        <div class="mt-3">
-          <span class="text-sm text-gray-600">Filtering by:</span>
-          <span
-            class="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full ml-2"
-          >
-            {{ current_tag }}
-          </span>
+          <div class="stat-card stat-card--primary fade-in-up delay-100" style="min-width: 180px;">
+            <p class="stat-card__label">Total Images</p>
+            <p class="stat-card__value">{{ total_count }}</p>
+          </div>
         </div>
-        {% endif %}
-      </div>
+      </section>
 
-      {% if images %}
-      <!-- Gallery Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {% for image in images %}
-        <div
-          class="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition"
-        >
-          <a href="/product/{{ image.file_id }}" class="block">
-            <img
-              src="{{ image.image_url }}"
-              alt="Segmentation result"
-              class="w-full h-64 object-cover hover:opacity-90 transition"
-            />
-          </a>
-          <div class="p-4">
-            <div class="flex justify-between items-start mb-3">
-              <div>
-                <p class="text-sm text-gray-500">{{ image.timestamp }}</p>
-                <p class="font-semibold text-gray-900 mt-1">
-                  {{ image.object_count }} objects detected
-                </p>
-              </div>
+      <!-- Search Section -->
+      <section class="container mx-auto px-6 lg:px-12 max-w-7xl mb-16 fade-in-up delay-200">
+        <div class="card">
+          <form method="get" action="/gallery" class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1 relative">
+              <input
+                type="text"
+                name="tag"
+                id="tagSearch"
+                value="{{ current_tag or '' }}"
+                placeholder="Search by tag (e.g., shirt, dress, pants...)"
+                list="tagSuggestions"
+                class="input w-full"
+              />
+              <datalist id="tagSuggestions">
+                <option value="short sleeve top"></option>
+                <option value="long sleeve top"></option>
+                <option value="short sleeve outwear"></option>
+                <option value="long sleeve outwear"></option>
+                <option value="vest"></option>
+                <option value="sling"></option>
+                <option value="shorts"></option>
+                <option value="trousers"></option>
+                <option value="skirt"></option>
+                <option value="short sleeve dress"></option>
+                <option value="long sleeve dress"></option>
+                <option value="vest dress"></option>
+                <option value="sling dress"></option>
+              </datalist>
             </div>
+            <button type="submit" class="btn btn-primary">
+              <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              Search
+            </button>
+            {% if current_tag %}
+            <a href="/gallery" class="btn btn-ghost">
+              Clear
+            </a>
+            {% endif %}
+          </form>
 
-            <div class="flex flex-wrap gap-1 mb-4">
-              {% for cls in image.classes %}
-              <span
-                class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
-              >
-                {{ cls }}
-              </span>
-              {% endfor %}
-            </div>
+          {% if current_tag %}
+          <div class="mt-6 pt-6 border-t border-light">
+            <span class="text-sm text-fog mr-3">Filtering by:</span>
+            <span class="tag">{{ current_tag }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </section>
 
-            <div class="flex flex-col space-y-2">
-              <div class="flex justify-between items-center">
-                <div class="flex space-x-2">
-                  <a
-                    href="{{ image.image_url }}"
-                    download
-                    class="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                  >
-                    <svg
-                      class="w-5 h-5 inline"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                      ></path>
-                    </svg>
-                  </a>
+      <!-- Gallery Grid or Empty State -->
+      <section class="container mx-auto px-6 lg:px-12 max-w-7xl pb-24">
+        {% if images %}
+        <div class="gallery-grid fade-in-up delay-300">
+          {% for image in images %}
+          <div class="gallery-item">
+            <a href="/product/{{ image.file_id }}" class="block">
+              <img
+                src="{{ image.image_url }}"
+                alt="Segmentation result"
+                class="gallery-item__image"
+              />
+            </a>
+            <div class="gallery-item__content">
+              <div class="flex justify-between items-start mb-4">
+                <div>
+                  <p class="text-sm text-fog mb-1">{{ image.timestamp }}</p>
+                  <p class="font-medium text-charcoal">
+                    {{ image.object_count }} objects detected
+                  </p>
                 </div>
+              </div>
+
+              <div class="flex flex-wrap gap-2 mb-5">
+                {% for cls in image.classes %}
+                <span class="tag">{{ cls }}</span>
+                {% endfor %}
+              </div>
+
+              <div class="flex justify-between items-center pt-4 border-t border-light">
+                <a
+                  href="{{ image.image_url }}"
+                  download
+                  class="text-dusty-blue hover:text-charcoal transition-colors text-sm font-medium"
+                  title="Download"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                  </svg>
+                </a>
                 <button
                   onclick="deleteImage('{{ image.file_id }}')"
-                  class="text-red-600 hover:text-red-800 text-sm font-medium"
+                  class="text-fog hover:text-red-500 transition-colors text-sm font-medium"
+                  title="Delete"
                 >
-                  <svg
-                    class="w-5 h-5 inline"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    ></path>
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                   </svg>
                 </button>
               </div>
             </div>
           </div>
+          {% endfor %}
         </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <!-- Empty State -->
-      <div class="text-center py-16">
-        <svg
-          class="w-24 h-24 mx-auto text-gray-400 mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          ></path>
-        </svg>
-        <h3 class="text-2xl font-semibold text-gray-700 mb-2">No Images Yet</h3>
-        <p class="text-gray-500 mb-6">Upload your first image to get started</p>
-        <a
-          href="/"
-          class="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-        >
-          Upload Images
-        </a>
-      </div>
-      {% endif %}
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-24 fade-in-up delay-300">
+          <svg class="w-24 h-24 mx-auto mb-8 text-fog" fill="none" stroke="currentColor" viewBox="0 0 24 24" opacity="0.5">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <h3 class="text-2xl font-light text-charcoal mb-3">No Images Yet</h3>
+          <p class="text-fog mb-10 text-lg">Upload your first fashion image to get started</p>
+          <a href="/" class="btn btn-primary btn-large">
+            Upload Images
+          </a>
+        </div>
+        {% endif %}
+      </section>
 
       <!-- Pagination -->
       {% if total_pages > 1 %}
-      <div class="mt-8 flex justify-center items-center space-x-2">
-        <!-- Previous Button -->
-        {% if current_page > 1 %}
-        <a
-          href="/gallery?page={{ current_page - 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
-          class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        >
-          <svg
-            class="w-5 h-5 inline"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <section class="container mx-auto px-6 lg:px-12 max-w-7xl pb-24">
+        <div class="flex justify-center items-center gap-3 flex-wrap">
+          <!-- Previous Button -->
+          {% if current_page > 1 %}
+          <a
+            href="/gallery?page={{ current_page - 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+            class="btn btn-ghost"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            ></path>
-          </svg>
-          Previous
-        </a>
-        {% else %}
-        <span
-          class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed"
-        >
-          <svg
-            class="w-5 h-5 inline"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            ></path>
-          </svg>
-          Previous
-        </span>
-        {% endif %}
+            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Previous
+          </a>
+          {% else %}
+          <span class="btn btn-ghost opacity-50 cursor-not-allowed">
+            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+            Previous
+          </span>
+          {% endif %}
 
-        <!-- Page Numbers -->
-        {% set start_page = [1, current_page - 2]|max %} {% set end_page =
-        [total_pages, current_page + 2]|min %} {% if start_page > 1 %}
-        <a
-          href="/gallery?page=1{% if current_tag %}&tag={{ current_tag }}{% endif %}"
-          class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        >
-          1
-        </a>
-        {% if start_page > 2 %}
-        <span class="px-2 text-gray-500">...</span>
-        {% endif %} {% endif %} {% for page_num in range(start_page, end_page +
-        1) %} {% if page_num == current_page %}
-        <span
-          class="px-4 py-2 bg-blue-600 text-white border border-blue-600 rounded-lg font-semibold"
-        >
-          {{ page_num }}
-        </span>
-        {% else %}
-        <a
-          href="/gallery?page={{ page_num }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
-          class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        >
-          {{ page_num }}
-        </a>
-        {% endif %} {% endfor %} {% if end_page < total_pages %} {% if end_page
-        < total_pages - 1 %}
-        <span class="px-2 text-gray-500">...</span>
-        {% endif %}
-        <a
-          href="/gallery?page={{ total_pages }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
-          class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        >
-          {{ total_pages }}
-        </a>
-        {% endif %}
+          <!-- Page Numbers -->
+          {% set start_page = [1, current_page - 2]|max %}
+          {% set end_page = [total_pages, current_page + 2]|min %}
 
-        <!-- Next Button -->
-        {% if current_page < total_pages %}
-        <a
-          href="/gallery?page={{ current_page + 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
-          class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-        >
-          Next
-          <svg
-            class="w-5 h-5 inline"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          {% if start_page > 1 %}
+          <a
+            href="/gallery?page=1{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+            class="btn btn-ghost"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            ></path>
-          </svg>
-        </a>
-        {% else %}
-        <span
-          class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-400 cursor-not-allowed"
-        >
-          Next
-          <svg
-            class="w-5 h-5 inline"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+            1
+          </a>
+          {% if start_page > 2 %}
+          <span class="text-fog px-2">...</span>
+          {% endif %}
+          {% endif %}
+
+          {% for page_num in range(start_page, end_page + 1) %}
+          {% if page_num == current_page %}
+          <span class="btn btn-primary">
+            {{ page_num }}
+          </span>
+          {% else %}
+          <a
+            href="/gallery?page={{ page_num }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+            class="btn btn-ghost"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            ></path>
-          </svg>
-        </span>
-        {% endif %}
-      </div>
+            {{ page_num }}
+          </a>
+          {% endif %}
+          {% endfor %}
+
+          {% if end_page < total_pages %}
+          {% if end_page < total_pages - 1 %}
+          <span class="text-fog px-2">...</span>
+          {% endif %}
+          <a
+            href="/gallery?page={{ total_pages }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+            class="btn btn-ghost"
+          >
+            {{ total_pages }}
+          </a>
+          {% endif %}
+
+          <!-- Next Button -->
+          {% if current_page < total_pages %}
+          <a
+            href="/gallery?page={{ current_page + 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+            class="btn btn-ghost"
+          >
+            Next
+            <svg class="w-5 h-5 inline ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </a>
+          {% else %}
+          <span class="btn btn-ghost opacity-50 cursor-not-allowed">
+            Next
+            <svg class="w-5 h-5 inline ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </span>
+          {% endif %}
+        </div>
+      </section>
       {% endif %}
-    </div>
+    </main>
 
-    <!-- Image Modal -->
-    <div id="imageModal" class="modal">
-      <span
-        onclick="closeModal()"
-        class="absolute top-4 right-4 text-white text-4xl cursor-pointer hover:text-gray-300"
-        >&times;</span
-      >
-      <img id="modalImage" class="modal-content" />
-    </div>
-
-    <!-- Canvas Modal -->
-    <div
-      id="canvasModal"
-      class="fixed inset-0 bg-black bg-opacity-80 hidden items-center justify-center z-50"
-    >
-      <div
-        class="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
-      >
-        <div class="p-4 border-b flex justify-between items-center">
-          <h3 class="text-xl font-bold text-gray-900">Canvas Editor</h3>
-          <div class="flex space-x-2">
-            <button
-              onclick="downloadCanvas()"
-              class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition text-sm"
-            >
-              Download Canvas
-            </button>
-            <button
-              onclick="closeCanvasModal()"
-              class="text-gray-500 hover:text-gray-700"
-            >
-              <svg
-                class="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="flex-1 overflow-auto p-4">
-          <div class="flex space-x-4">
-            <div class="flex-1">
-              <canvas
-                id="drawCanvas"
-                class="border border-gray-300 max-w-full"
-              ></canvas>
-            </div>
-            <div
-              class="w-64 bg-gray-50 p-4 rounded overflow-y-auto max-h-[calc(90vh-120px)]"
-            >
-              <h4 class="font-semibold mb-3">Detected Objects</h4>
-              <div id="canvasObjectsList" class="space-y-2"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
+    <!-- Scripts -->
     <script defer src="/static/gallery.js?v={{ APP_VERSION }}"></script>
   </body>
 </html>

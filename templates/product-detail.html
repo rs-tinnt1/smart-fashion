@@ -3,284 +3,291 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Product Details - Clothing Segmentation</title>
+    <title>Product Details — Fashion AI Segmentation</title>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Scandinavian Design System -->
+    <link rel="stylesheet" href="/static/scandinavian.css?v={{ APP_VERSION }}" />
+
+    <!-- Fonts: Newsreader + Manrope -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@300;400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+
     <style>
-      .tag-animation {
-        animation: fadeInUp 0.5s ease-out;
+      /* Match home page styling */
+      body {
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
+        color: #2E2E2E;
       }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Newsreader', Georgia, serif;
+        letter-spacing: -0.02em;
+      }
+
+      /* Subtle noise texture */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      nav, main {
+        position: relative;
+        z-index: 2;
+      }
+
+      .accent-line {
+        width: 80px;
+        height: 3px;
+        background: linear-gradient(90deg, #6B8E9E, #9CAF88);
+        border-radius: 2px;
+      }
+
+      /* Animations */
       @keyframes fadeInUp {
         from {
           opacity: 0;
-          transform: translateY(10px);
+          transform: translateY(24px);
         }
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
-      /* Staggered animation delays for tags */
-      .tag-delay-0 {
-        animation-delay: 0s;
+
+      .fade-in-up {
+        animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0;
       }
-      .tag-delay-1 {
-        animation-delay: 0.1s;
-      }
-      .tag-delay-2 {
-        animation-delay: 0.2s;
-      }
-      .tag-delay-3 {
-        animation-delay: 0.3s;
-      }
-      .tag-delay-4 {
-        animation-delay: 0.4s;
-      }
-      .tag-delay-5 {
-        animation-delay: 0.5s;
-      }
-      .tag-delay-6 {
-        animation-delay: 0.6s;
-      }
-      .tag-delay-7 {
-        animation-delay: 0.7s;
-      }
-      .tag-delay-8 {
-        animation-delay: 0.8s;
-      }
-      .tag-delay-9 {
-        animation-delay: 0.9s;
-      }
-      .image-container {
-        position: relative;
+
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+      .delay-400 { animation-delay: 400ms; }
+
+      /* Staggered tag animations */
+      .tag-delay-0 { animation-delay: 0ms; }
+      .tag-delay-1 { animation-delay: 50ms; }
+      .tag-delay-2 { animation-delay: 100ms; }
+      .tag-delay-3 { animation-delay: 150ms; }
+      .tag-delay-4 { animation-delay: 200ms; }
+      .tag-delay-5 { animation-delay: 250ms; }
+      .tag-delay-6 { animation-delay: 300ms; }
+      .tag-delay-7 { animation-delay: 350ms; }
+      .tag-delay-8 { animation-delay: 400ms; }
+      .tag-delay-9 { animation-delay: 450ms; }
+
+      /* Custom utilities */
+      .text-charcoal { color: #2E2E2E; }
+      .text-fog { color: #9E9E9E; }
+      .text-dusty-blue { color: #6B8E9E; }
+      .bg-pearl { background-color: #FAFAFA; }
+      .bg-warm-white { background-color: #F5F5F5; }
+      .border-light { border-color: #E8E8E8; }
+
+      /* Canvas container */
+      .canvas-container {
+        background: #FFFFFF;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
         overflow: hidden;
-        border-radius: 0.5rem;
       }
-      .image-container img {
-        transition: transform 0.3s ease;
+
+      /* Radio button styling */
+      input[type="radio"] {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 2px solid #E8E8E8;
+        border-radius: 50%;
+        outline: none;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
       }
-      .image-container:hover img {
-        transform: scale(1.05);
+
+      input[type="radio"]:checked {
+        border-color: #6B8E9E;
+      }
+
+      input[type="radio"]:checked::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 8px;
+        background: #6B8E9E;
+        border-radius: 50%;
+      }
+
+      input[type="radio"]:hover {
+        border-color: #6B8E9E;
       }
     </style>
   </head>
-  <body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+
+  <body class="overflow-x-hidden">
     <!-- Navigation -->
-    <nav class="bg-white shadow-md">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <svg
-              class="w-8 h-8 text-blue-600 mr-3"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              ></path>
-            </svg>
-            <h1 class="text-2xl font-bold text-gray-800">
-              Fashion AI Segmentation
-            </h1>
+    <nav class="scandi-nav fixed w-full top-0 z-50">
+      <div class="container mx-auto px-6 lg:px-12 max-w-7xl">
+        <div class="flex justify-between items-center h-24">
+          <div class="scandi-nav__logo fade-in-up" style="font-weight: 500; font-size: 0.9rem;">
+            FASHION AI
           </div>
-          <div class="flex space-x-4">
-            <a href="/" class="text-gray-600 hover:text-blue-600 transition"
-              >Upload</a
-            >
-            <a
-              href="/gallery"
-              class="text-gray-600 hover:text-blue-600 transition"
-              >Gallery</a
-            >
-            <a
-              href="/docs"
-              target="_blank"
-              class="text-gray-600 hover:text-blue-600 transition"
-              >API Docs</a
-            >
+          <div class="flex gap-10 fade-in-up delay-100">
+            <a href="/" class="scandi-nav__link">Upload</a>
+            <a href="/gallery" class="scandi-nav__link">Gallery</a>
+            <a href="/docs" target="_blank" class="scandi-nav__link">Docs</a>
           </div>
         </div>
       </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="pt-24">
       <!-- Back Button -->
-      <div class="mb-6">
+      <section class="container mx-auto px-6 lg:px-12 max-w-6xl py-8">
         <a
           href="/gallery"
-          class="inline-flex items-center text-blue-600 hover:text-blue-800 transition font-medium"
+          class="inline-flex items-center text-dusty-blue hover:text-charcoal transition-colors font-medium fade-in-up"
         >
-          <svg
-            class="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            ></path>
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
           </svg>
           Back to Gallery
         </a>
-      </div>
+      </section>
 
-      <!-- Product Detail Card -->
-      <div class="bg-white rounded-xl shadow-2xl overflow-hidden">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
-          <!-- Image Section -->
-          <div class="space-y-4">
-            <div class="image-container bg-gray-100">
-              <canvas id="productCanvas" class="w-full h-auto"></canvas>
-              <img
-                id="originalImage"
-                src="{{ original_url }}"
-                alt="Original Product"
-                class="hidden"
-              />
-            </div>
-
-            <!-- Display Mode Radio Buttons -->
-            <div
-              class="flex items-center justify-center space-x-6 bg-white p-3 rounded-lg shadow"
-            >
-              <span class="text-sm font-medium text-gray-700">Display Mode:</span>
-              <label class="inline-flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="displayMode"
-                  value="image"
-                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+      <!-- Product Detail -->
+      <section class="container mx-auto px-6 lg:px-12 max-w-6xl pb-24">
+        <div class="card fade-in-up delay-100">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <!-- Image Section -->
+            <div class="space-y-6">
+              <div class="canvas-container">
+                <canvas id="productCanvas" class="w-full h-auto"></canvas>
+                <img
+                  id="originalImage"
+                  src="{{ original_url }}"
+                  alt="Original Product"
+                  class="hidden"
                 />
-                <span class="ml-2 text-sm text-gray-700">Image</span>
-              </label>
-              <label class="inline-flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="displayMode"
-                  value="polygon"
-                  checked
-                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                />
-                <span class="ml-2 text-sm text-gray-700">Polygon</span>
-              </label>
-              <label class="inline-flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="displayMode"
-                  value="rectangle"
-                  class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                />
-                <span class="ml-2 text-sm text-gray-700">Rectangle</span>
-              </label>
-            </div>
+              </div>
 
-            <div class="text-sm text-gray-500 text-center">
-              <p>Processed: {{ timestamp }}</p>
-            </div>
-          </div>
+              <!-- Display Mode Controls -->
+              <div class="bg-warm-white p-5 rounded-lg border border-light">
+                <p class="text-sm font-medium text-charcoal mb-4">Display Mode</p>
+                <div class="flex items-center gap-6">
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="displayMode"
+                      value="image"
+                      class="mr-2"
+                    />
+                    <span class="text-sm text-charcoal">Image</span>
+                  </label>
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="displayMode"
+                      value="polygon"
+                      checked
+                      class="mr-2"
+                    />
+                    <span class="text-sm text-charcoal">Polygon</span>
+                  </label>
+                  <label class="inline-flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="displayMode"
+                      value="rectangle"
+                      class="mr-2"
+                    />
+                    <span class="text-sm text-charcoal">Rectangle</span>
+                  </label>
+                </div>
+              </div>
 
-          <!-- Details Section -->
-          <div class="space-y-6">
-            <div>
-              <h2 class="text-3xl font-bold text-gray-900 mb-2">
-                Product Details
-              </h2>
-              <p class="text-gray-600">
-                AI-powered clothing segmentation results
+              <p class="text-sm text-fog text-center">
+                Processed: {{ timestamp }}
               </p>
             </div>
 
-            <!-- Statistics -->
-            <div class="grid grid-cols-2 gap-4">
-              <div
-                class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg"
-              >
-                <p class="text-sm text-gray-600 font-medium">
-                  Objects Detected
-                </p>
-                <p class="text-3xl font-bold text-blue-600 mt-1">
-                  {{ object_count }}
-                </p>
-              </div>
-              <div
-                class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg"
-              >
-                <p class="text-sm text-gray-600 font-medium">Unique Classes</p>
-                <p class="text-3xl font-bold text-green-600 mt-1">
-                  {{ classes|length }}
+            <!-- Details Section -->
+            <div class="space-y-8">
+              <div>
+                <div class="accent-line mb-6"></div>
+                <h2 class="text-3xl lg:text-4xl font-light mb-3 text-charcoal">
+                  Product Details
+                </h2>
+                <p class="text-fog text-base">
+                  AI-powered clothing segmentation results
                 </p>
               </div>
-            </div>
 
-            <!-- Product Tags -->
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900 mb-3">
-                Detected Items
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                {% if classes %} {% for cls in classes %}
-                <span
-                  class="tag-animation tag-delay-{{ loop.index0 % 10 }} inline-flex items-center bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-md hover:shadow-lg transition transform hover:scale-105"
+              <!-- Statistics Grid -->
+              <div class="grid grid-cols-2 gap-4">
+                <div class="stat-card stat-card--primary">
+                  <p class="stat-card__label">Objects Detected</p>
+                  <p class="stat-card__value">{{ object_count }}</p>
+                </div>
+                <div class="stat-card stat-card--secondary">
+                  <p class="stat-card__label">Unique Classes</p>
+                  <p class="stat-card__value">{{ classes|length }}</p>
+                </div>
+              </div>
+
+              <!-- Detected Items -->
+              <div>
+                <h3 class="text-xl font-medium text-charcoal mb-4">
+                  Detected Items
+                </h3>
+                <div class="flex flex-wrap gap-2">
+                  {% if classes %}
+                  {% for cls in classes %}
+                  <span class="tag fade-in-up tag-delay-{{ loop.index0 % 10 }}">
+                    {{ cls }}
+                  </span>
+                  {% endfor %}
+                  {% else %}
+                  <p class="text-fog">No items detected</p>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Download Button -->
+              <div class="pt-6 border-t border-light">
+                <button
+                  id="downloadBtn"
+                  class="btn btn-primary w-full justify-center"
                 >
-                  <svg
-                    class="w-4 h-4 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                    ></path>
+                  <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                   </svg>
-                  {{ cls }}
-                </span>
-                {% endfor %} {% else %}
-                <p class="text-gray-500">No items detected</p>
-                {% endif %}
+                  Download Image
+                </button>
               </div>
-            </div>
 
-            <!-- Download Button -->
-            <div class="pt-6 border-t border-gray-200">
-              <button
-                id="downloadBtn"
-                class="w-full inline-flex items-center justify-center bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-4 rounded-lg hover:from-green-600 hover:to-green-700 transition shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg"
-              >
-                <svg
-                  class="w-6 h-6 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  ></path>
-                </svg>
-                Download Image
-              </button>
-            </div>
-
-            <!-- Additional Info -->
-            <div class="pt-4 border-t border-gray-200">
-              <p class="text-xs text-gray-500">File ID: {{ file_id }}</p>
+              <!-- File Info -->
+              <div class="pt-4 border-t border-light">
+                <p class="text-xs text-fog">File ID: {{ file_id }}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
 
     <!-- Hidden data for JavaScript -->
     <script id="detectionsData" type="application/json">
