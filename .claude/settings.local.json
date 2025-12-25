@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git mv:*)",
+      "Bash(git rm:*)",
+      "Bash(poetry run pytest:*)",
+      "Bash(poetry run python:*)"
     ]
   }
 }

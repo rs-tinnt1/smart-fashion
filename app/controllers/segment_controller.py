@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request
-from app.services.api import segment_one_file, delete_output, get_stats
-from app.services.database import get_database, DatabaseService
+from app.services.segmentation_service import segment_one_file, delete_output, get_stats
+from app.services.database_service import get_database, DatabaseService
 from typing import List
 from datetime import datetime
 import uuid

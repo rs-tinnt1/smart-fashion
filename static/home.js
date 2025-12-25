@@ -229,10 +229,9 @@
     const card = document.createElement("div");
     card.className = "bg-gray-50 rounded-lg overflow-hidden";
 
-    const objectsDetected = result.objects?.length || 0;
-    const classes = result.objects
-      ? [...new Set(result.objects.map((obj) => obj.class_name))]
-      : [];
+    const objects = result.segmentation_data?.objects || [];
+    const objectsDetected = objects.length;
+    const classes = [...new Set(objects.map((obj) => obj.class_name))];
 
     card.innerHTML = `
             <img src="${
@@ -257,12 +256,6 @@
                       .join("")}
                 </div>
                 <div class="flex space-x-2">
-                    <button onclick="window.HomeApp.openCanvasEditor('${
-                      result.file_id
-                    }')" 
-                            class="flex-1 bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium">
-                        Edit in Canvas
-                    </button>
                     <a href="${result.original_image_url}" download 
                        class="flex-1 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm font-medium text-center">
                         Download
@@ -272,23 +265,6 @@
         `;
 
     return card;
-  }
-
-  async function openCanvasEditor(fileId) {
-    try {
-      const response = await fetch(`/api/details/${fileId}`);
-      if (!response.ok) throw new Error("Failed to fetch details");
-
-      const data = await response.json();
-      currentCanvasData = data;
-
-      initCanvas(data);
-      canvasModal.classList.remove("hidden");
-      canvasModal.classList.add("flex");
-    } catch (error) {
-      console.error("Error opening canvas:", error);
-      alert("Failed to load canvas data");
-    }
   }
 
   function initCanvas(data) {
@@ -377,7 +353,6 @@
   // Expose public API
   window.HomeApp = {
     removeFile,
-    openCanvasEditor,
     closeCanvasModal,
     downloadCanvas,
   };

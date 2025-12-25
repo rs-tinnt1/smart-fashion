@@ -12,12 +12,12 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from app.models.schemas import (
-    UploadResponse, ImageResponse, DetectionDetail, JobStatus,
-    DetectionSummary, BBox, PolygonData, PolygonPoint
-)
-from app.services.database import get_database, DatabaseService
-from app.services.minio_service import get_minio_service
+from app.models.upload_schema import UploadResponse
+from app.models.image_schema import ImageResponse
+from app.models.detection_schema import DetectionDetail, DetectionSummary, BBox, PolygonData, PolygonPoint
+from app.models.job_schema import JobStatus
+from app.services.database_service import get_database, DatabaseService
+from app.services.storage_service import get_minio_service
 
 router = APIRouter(tags=["upload"])
 

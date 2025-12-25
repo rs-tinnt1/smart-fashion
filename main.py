@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pathlib import Path
 from app.config import UPLOAD_DIR, OUTPUT_DIR, STATIC_DIR, MINIO_MODEL_KEY, LOCAL_MODEL_CACHE, MINIO_BUCKET
-from app.controllers.api_controller import router as api_router
+from app.controllers.segment_controller import router as api_router
 from app.controllers.gallery_controller import router as gallery_router
 from app.controllers.upload_controller import router as upload_router
 
@@ -23,13 +23,13 @@ async def lifespan(app: FastAPI):
     # Startup
     try:
         # Initialize MinIO service
-        from app.services.minio_service import get_minio_service
+        from app.services.storage_service import get_minio_service
         minio_service = get_minio_service()
         minio_service.ensure_bucket_exists()
-        
-        # Inject minio_service into api_controller
-        import app.controllers.api_controller
-        app.controllers.api_controller.minio_service = minio_service
+
+        # Inject minio_service into segment_controller
+        import app.controllers.segment_controller
+        app.controllers.segment_controller.minio_service = minio_service
         
         # Download model from MinIO
         LOCAL_MODEL_CACHE.mkdir(parents=True, exist_ok=True)
@@ -44,16 +44,16 @@ async def lifespan(app: FastAPI):
             print(f"Using cached model: {local_model_path}")
         
         # Use ONNX Runtime for inference
-        from app.services.onnx_inference import ONNXYOLOSegmentation
+        from app.services.inference_service import ONNXYOLOSegmentation
         print(f"Loading ONNX model from {local_model_path}")
         model = ONNXYOLOSegmentation(str(local_model_path))
         print(f"ONNX model loaded successfully")
-        
+
         # Inject model into controller
-        app.controllers.api_controller.model = model
+        app.controllers.segment_controller.model = model
         
         # Initialize database connection pool
-        from app.services.database import get_database
+        from app.services.database_service import get_database
         db = await get_database()
         print("Database connection pool initialized")
         
@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
     
     # Shutdown
     try:
-        from app.services.database import close_database
+        from app.services.database_service import close_database
         await close_database()
         print("Database connection pool closed")
     except Exception as e:

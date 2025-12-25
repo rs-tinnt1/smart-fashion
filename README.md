@@ -11,8 +11,7 @@ FastAPI application for clothing segmentation using YOLOv8 with ONNX Runtime.
 poetry install
 
 # Run development server
-poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers
- 1
+poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
 
 # Run tests
 poetry run pytest

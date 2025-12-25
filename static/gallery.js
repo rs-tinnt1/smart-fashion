@@ -7,7 +7,6 @@
   // DOM Elements
   let imageModal, modalImage;
   let canvasModal, drawCanvas, canvasObjectsList;
-  let currentCanvasData = null;
 
   // Initialize on DOM ready
   document.addEventListener("DOMContentLoaded", function () {

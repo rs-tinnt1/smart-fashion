@@ -20,9 +20,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from app.config import (
     LOCAL_MODEL_CACHE, MINIO_MODEL_KEY, MINIO_BUCKET, COLORS
 )
-from app.services.database import get_database, close_database
-from app.services.minio_service import get_minio_service
-from app.services.onnx_inference import ONNXYOLOSegmentation
+from app.services.database_service import get_database, close_database
+from app.services.storage_service import get_minio_service
+from app.services.inference_service import ONNXYOLOSegmentation
 
 
 class Worker:

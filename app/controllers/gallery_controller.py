@@ -11,9 +11,10 @@ from typing import List
 from datetime import datetime
 import json
 
-from app.services.database import get_database, DatabaseService
-from app.services.minio_service import get_minio_service
-from app.models.schemas import ImageSummary, DetectionSummary, BBox
+from app.services.database_service import get_database, DatabaseService
+from app.services.storage_service import get_minio_service
+from app.models.image_schema import ImageSummary
+from app.models.detection_schema import DetectionSummary, BBox
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")

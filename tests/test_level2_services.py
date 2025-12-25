@@ -25,7 +25,7 @@ class TestDatabaseService:
     @pytest.mark.skipif(not AIOMYSQL_AVAILABLE, reason="aiomysql not installed locally")
     async def test_database_connection(self):
         """INT-SVC-001: Verify database connection pool initializes."""
-        from app.services.database import get_database
+        from app.services.database_service import get_database
         
         db = await get_database()
         assert db is not None, "Database service should be initialized"
@@ -36,7 +36,7 @@ class TestDatabaseService:
     @pytest.mark.skipif(not AIOMYSQL_AVAILABLE, reason="aiomysql not installed locally")
     async def test_create_and_get_image(self):
         """INT-SVC-002: Test image CRUD operations."""
-        from app.services.database import get_database
+        from app.services.database_service import get_database
         
         db = await get_database()
         
@@ -63,7 +63,7 @@ class TestDatabaseService:
     @pytest.mark.skipif(not AIOMYSQL_AVAILABLE, reason="aiomysql not installed locally")
     async def test_create_detection(self):
         """INT-SVC-002: Test detection creation."""
-        from app.services.database import get_database
+        from app.services.database_service import get_database
         
         db = await get_database()
         
@@ -102,7 +102,7 @@ class TestDatabaseService:
     @pytest.mark.skipif(not AIOMYSQL_AVAILABLE, reason="aiomysql not installed locally")
     async def test_create_polygon(self):
         """INT-SVC-002: Test polygon creation."""
-        from app.services.database import get_database
+        from app.services.database_service import get_database
         
         db = await get_database()
         
@@ -144,7 +144,7 @@ class TestMinIOService:
     @pytest.mark.level2
     def test_minio_service_initialization(self):
         """INT-SVC-003: Verify MinIO service initializes."""
-        from app.services.minio_service import get_minio_service
+        from app.services.storage_service import get_minio_service
         
         minio = get_minio_service()
         assert minio is not None, "MinIO service should be initialized"
@@ -153,7 +153,7 @@ class TestMinIOService:
     @pytest.mark.level2
     def test_minio_bucket_exists(self):
         """INT-SVC-003: Verify bucket exists or can be created."""
-        from app.services.minio_service import get_minio_service
+        from app.services.storage_service import get_minio_service
         
         minio = get_minio_service()
         # Just check if client can list bucket - don't try to create
@@ -167,7 +167,7 @@ class TestMinIOService:
     @pytest.mark.level2
     def test_minio_presigned_url_format(self):
         """INT-SVC-004: Verify presigned URL uses localhost, not minio."""
-        from app.services.minio_service import get_minio_service
+        from app.services.storage_service import get_minio_service
         
         minio = get_minio_service()
         
@@ -186,7 +186,7 @@ class TestMinIOService:
     def test_minio_upload_and_access(self):
         """INT-SVC-003 & INT-SVC-004: Test upload and presigned URL access."""
         import httpx
-        from app.services.minio_service import get_minio_service
+        from app.services.storage_service import get_minio_service
         
         minio = get_minio_service()
         
