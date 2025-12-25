@@ -1,0 +1,49 @@
+{% macro gallery_card(image) %}
+<div class="gallery-item">
+  <a href="/product/{{ image.file_id }}" class="block">
+    <img
+      src="{{ image.image_url }}"
+      alt="Segmentation result"
+      class="gallery-item__image"
+    />
+  </a>
+  <div class="gallery-item__content">
+    <div class="flex justify-between items-start mb-4">
+      <div>
+        <p class="text-sm text-fog mb-1">{{ image.timestamp }}</p>
+        <p class="font-medium text-charcoal">
+          {{ image.object_count }} objects detected
+        </p>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 mb-5">
+      {% for cls in image.classes %}
+      <span class="tag">{{ cls }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="flex justify-between items-center pt-4 border-t border-light">
+      <a
+        href="{{ image.image_url }}"
+        download
+        class="text-dusty-blue hover:text-charcoal transition-colors text-sm font-medium"
+        title="Download"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+        </svg>
+      </a>
+      <button
+        data-delete-image="{{ image.file_id }}"
+        class="text-fog hover:text-red-500 transition-colors text-sm font-medium"
+        title="Delete"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+{% endmacro %}

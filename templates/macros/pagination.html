@@ -1,0 +1,90 @@
+{% macro render_pagination(current_page, total_pages, base_url='/gallery', current_tag=None) %}
+{% if total_pages > 1 %}
+<section class="container mx-auto px-6 lg:px-12 max-w-7xl pb-24">
+  <div class="flex justify-center items-center gap-3 flex-wrap">
+    <!-- Previous Button -->
+    {% if current_page > 1 %}
+    <a
+      href="{{ base_url }}?page={{ current_page - 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+      class="btn btn-ghost"
+    >
+      <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+      </svg>
+      Previous
+    </a>
+    {% else %}
+    <span class="btn btn-ghost opacity-50 cursor-not-allowed">
+      <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+      </svg>
+      Previous
+    </span>
+    {% endif %}
+
+    <!-- Page Numbers -->
+    {% set start_page = [1, current_page - 2]|max %}
+    {% set end_page = [total_pages, current_page + 2]|min %}
+
+    {% if start_page > 1 %}
+    <a
+      href="{{ base_url }}?page=1{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+      class="btn btn-ghost"
+    >
+      1
+    </a>
+    {% if start_page > 2 %}
+    <span class="text-fog px-2">...</span>
+    {% endif %}
+    {% endif %}
+
+    {% for page_num in range(start_page, end_page + 1) %}
+    {% if page_num == current_page %}
+    <span class="btn btn-primary">
+      {{ page_num }}
+    </span>
+    {% else %}
+    <a
+      href="{{ base_url }}?page={{ page_num }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+      class="btn btn-ghost"
+    >
+      {{ page_num }}
+    </a>
+    {% endif %}
+    {% endfor %}
+
+    {% if end_page < total_pages %}
+    {% if end_page < total_pages - 1 %}
+    <span class="text-fog px-2">...</span>
+    {% endif %}
+    <a
+      href="{{ base_url }}?page={{ total_pages }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+      class="btn btn-ghost"
+    >
+      {{ total_pages }}
+    </a>
+    {% endif %}
+
+    <!-- Next Button -->
+    {% if current_page < total_pages %}
+    <a
+      href="{{ base_url }}?page={{ current_page + 1 }}{% if current_tag %}&tag={{ current_tag }}{% endif %}"
+      class="btn btn-ghost"
+    >
+      Next
+      <svg class="w-5 h-5 inline ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+      </svg>
+    </a>
+    {% else %}
+    <span class="btn btn-ghost opacity-50 cursor-not-allowed">
+      Next
+      <svg class="w-5 h-5 inline ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+      </svg>
+    </span>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}

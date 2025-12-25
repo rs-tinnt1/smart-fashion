@@ -73,22 +73,67 @@ podman-compose -f compose.prod.yml up -d
 
 ```
 ├── app/
-│   ├── controllers/          # API routes
-│   ├── models/               # Data models
-│   └── services/
-│       ├── api.py            # Core segmentation logic
-│       ├── onnx_inference.py # ONNX Runtime wrapper
-│       ├── database.py       # Database service
-│       └── minio_service.py  # MinIO service
-├── templates/                # Jinja2 templates
-├── static/                   # Static files (JS)
-├── tests/                    # Integration tests
-├── db/                       # Database schema
-├── Dockerfile                # Production-optimized
-├── compose.yml               # Development
-├── compose.prod.yml          # Production
-├── pyproject.toml            # Poetry configuration
-└── poetry.lock               # Locked dependencies
+│   ├── controllers/                    # API routes (FastAPI routers)
+│   │   ├── segment_controller.py       # Segmentation API endpoints
+│   │   ├── gallery_controller.py       # Gallery & product detail views
+│   │   └── upload_controller.py        # Upload & job status endpoints
+│   ├── models/                         # Pydantic schemas (request/response)
+│   │   ├── detection_schema.py         # BBox, Polygon, Detection models
+│   │   ├── image_schema.py             # Image metadata models
+│   │   ├── upload_schema.py            # Upload response models
+│   │   ├── job_schema.py               # Job status models
+│   │   └── health_schema.py            # Health check models
+│   ├── services/                       # Business logic & infrastructure
+│   │   ├── segmentation_service.py     # Core segmentation logic
+│   │   ├── inference_service.py        # ONNX Runtime wrapper
+│   │   ├── database_service.py         # MariaDB operations
+│   │   ├── storage_service.py          # MinIO/S3 operations
+│   │   └── web_service.py              # Web utilities
+│   └── config.py                       # Configuration settings
+├── templates/                          # Jinja2 HTML templates
+├── static/                             # Static assets (CSS, JS, images)
+├── tests/                              # 4-level integration tests
+├── db/                                 # Database schema (SQL)
+├── docs/                               # Documentation
+├── worker.py                           # Background job processor
+├── main.py                             # FastAPI application entry point
+├── Dockerfile                          # Production container image
+├── compose.yml                         # Development environment
+├── compose.prod.yml                    # Production environment
+├── pyproject.toml                      # Poetry dependencies
+└── poetry.lock                         # Locked dependency versions
+```
+
+### Architecture Principles
+
+**Flat Architecture**: Files use descriptive names with suffixes instead of deep nesting
+- ✅ `services/database_service.py` - Clear, flat structure
+- ❌ `services/database/service.py` - Unnecessary nesting
+
+**Naming Conventions**:
+- Controllers: `*_controller.py` (e.g., `segment_controller.py`)
+- Services: `*_service.py` (e.g., `database_service.py`)
+- Models: `*_schema.py` (e.g., `detection_schema.py`)
+
+**Dependency Flow**: Controllers → Services → Models (no circular dependencies)
+
+### Import Examples
+
+```python
+# Import from specific modules
+from app.services.segmentation_service import segment_one_file
+from app.services.database_service import get_database, DatabaseService
+from app.services.storage_service import get_minio_service
+from app.services.inference_service import ONNXYOLOSegmentation
+
+from app.models.detection_schema import BBox, DetectionSummary, PolygonData
+from app.models.image_schema import ImageResponse
+from app.models.job_schema import JobStatus
+
+# Or use package-level imports (via __init__.py)
+from app.services import get_database, segment_one_file, ONNXYOLOSegmentation
+from app.models import DetectionSummary, ImageResponse, JobStatus
+from app.controllers import segment_router, gallery_router, upload_router
 ```
 
 ## Development

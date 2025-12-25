@@ -1,0 +1,73 @@
+{% extends "layouts/base.html" %}
+{% from "macros/navigation.html" import render_nav %}
+
+{% block title %}Fashion AI Segmentation — Studio{% endblock %}
+{% block page_identifier %}upload{% endblock %}
+
+{% block navigation %}
+  {{ render_nav('upload') }}
+{% endblock %}
+
+{% block content %}
+  <!-- Hero Section: Asymmetric, generous whitespace -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-7xl py-20 lg:py-32">
+    <div class="hero-container" style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
+      <div class="fade-in-up">
+        <div class="accent-line mb-8"></div>
+        <h1 class="text-5xl lg:text-7xl font-light leading-tight mb-6 text-charcoal">
+          Intelligent<br/>
+          Garment <span class="text-dusty-blue font-normal">Segmentation</span>
+        </h1>
+        <p class="text-lg lg:text-xl text-fog font-light leading-relaxed max-w-xl">
+          AI-powered clothing analysis with precision detection.
+          Upload fashion imagery and witness real-time segmentation.
+        </p>
+      </div>
+
+      <!-- Decorative empty space for asymmetry -->
+      <div class="hidden lg:flex items-center justify-end fade-in-up delay-200">
+        <div class="w-32 h-32 rounded-full" style="background: linear-gradient(135deg, rgba(107, 142, 158, 0.1), rgba(156, 175, 136, 0.1)); backdrop-filter: blur(40px);"></div>
+      </div>
+    </div>
+  </section>
+
+  <style>
+    @media (min-width: 1024px) {
+      .hero-container {
+        grid-template-columns: 2fr 1fr !important;
+        align-items: center;
+      }
+    }
+  </style>
+
+  <!-- Spacer: Generous vertical rhythm -->
+  <div class="h-16 lg:h-24"></div>
+
+  <!-- Upload Section: Large, inviting drop zone -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-6xl mb-24 fade-in-up delay-300">
+    <div class="card mb-10">
+      <h2 class="text-3xl lg:text-4xl font-light mb-3 text-charcoal">Upload Images</h2>
+      <p class="text-fog text-sm">Select or drag fashion images for AI processing</p>
+    </div>
+
+    {% include 'components/upload_zone.html' %}
+  </section>
+
+  <!-- Results Section: Soft card grid -->
+  <section id="resultsSection" class="hidden container mx-auto px-6 lg:px-12 max-w-7xl pb-32">
+    <div class="mb-16">
+      <div class="accent-line mb-6"></div>
+      <h2 class="text-4xl lg:text-5xl font-light mb-4 text-charcoal">Segmentation Results</h2>
+      <p class="text-fog text-lg">Analyzed garments with precision detection</p>
+    </div>
+    <div id="resultsContainer" class="gallery-grid"></div>
+  </section>
+{% endblock %}
+
+{% block modals %}
+  {% include 'components/canvas_modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+{% endblock %}

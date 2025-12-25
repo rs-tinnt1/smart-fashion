@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Fashion AI Segmentation{% endblock %}</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Global Styles -->
+    <link rel="stylesheet" href="/static/global.css?v={{ APP_VERSION }}" />
+
+    <!-- Fonts: Distinctive pairing -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@300;400;500;600&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+      /* Custom refinements for bespoke feel */
+      body {
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
+        color: #2E2E2E;
+      }
+
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Newsreader', Georgia, serif;
+        letter-spacing: -0.02em;
+      }
+
+      /* Subtle noise texture for organic depth */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='4' numOctaves='2' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      /* Ensure content stays above texture */
+      nav, main, #canvasModal {
+        position: relative;
+        z-index: 2;
+      }
+
+      /* Decorative accent line */
+      .accent-line {
+        width: 80px;
+        height: 3px;
+        background: linear-gradient(90deg, #6B8E9E, #9CAF88);
+        border-radius: 2px;
+      }
+
+      /* Custom animations */
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(24px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .fade-in-up {
+        animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0;
+      }
+
+      .delay-100 { animation-delay: 100ms; }
+      .delay-200 { animation-delay: 200ms; }
+      .delay-300 { animation-delay: 300ms; }
+      .delay-400 { animation-delay: 400ms; }
+      .delay-500 { animation-delay: 500ms; }
+
+      /* Override Tailwind defaults for Nordic aesthetic */
+      .text-charcoal { color: #2E2E2E; }
+      .text-fog { color: #9E9E9E; }
+      .text-dusty-blue { color: #6B8E9E; }
+      .text-sage { color: #9CAF88; }
+      .bg-pearl { background-color: #FAFAFA; }
+      .bg-warm-white { background-color: #F5F5F5; }
+      .border-light { border-color: #E8E8E8; }
+    </style>
+
+    {% block extra_styles %}{% endblock %}
+
+    {% block extra_head %}{% endblock %}
+  </head>
+
+  <body class="overflow-x-hidden" data-page="{% block page_identifier %}{% endblock %}">
+    {% block navigation %}{% endblock %}
+
+    <main class="pt-24">
+      {% block content %}{% endblock %}
+    </main>
+
+    {% block modals %}{% endblock %}
+
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

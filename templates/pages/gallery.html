@@ -1,0 +1,112 @@
+{% extends "layouts/base.html" %}
+{% from "macros/navigation.html" import render_nav %}
+{% from "macros/pagination.html" import render_pagination %}
+{% from "macros/stats.html" import stat_card %}
+{% from "components/gallery_item.html" import gallery_card %}
+
+{% block title %}Gallery — Fashion AI Segmentation{% endblock %}
+{% block page_identifier %}gallery{% endblock %}
+
+{% block navigation %}
+  {{ render_nav('gallery') }}
+{% endblock %}
+
+{% block content %}
+  <!-- Header Section -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-7xl py-16 lg:py-20">
+    <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 fade-in-up">
+      <div>
+        <div class="accent-line mb-6"></div>
+        <h1 class="text-4xl lg:text-6xl font-light mb-3 text-charcoal">
+          Image <span class="text-dusty-blue font-normal">Gallery</span>
+        </h1>
+        <p class="text-fog text-lg font-light">Browse all processed fashion images</p>
+      </div>
+      <div class="fade-in-up delay-100" style="min-width: 180px;">
+        {{ stat_card('Total Images', total_count, 'primary') }}
+      </div>
+    </div>
+  </section>
+
+  <!-- Search Section -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-7xl mb-16 fade-in-up delay-200">
+    <div class="card">
+      <form method="get" action="/gallery" class="flex flex-col md:flex-row gap-4">
+        <div class="flex-1 relative">
+          <input
+            type="text"
+            name="tag"
+            id="tagSearch"
+            value="{{ current_tag or '' }}"
+            placeholder="Search by tag (e.g., shirt, dress, pants...)"
+            list="tagSuggestions"
+            class="input w-full"
+          />
+          <datalist id="tagSuggestions">
+            <option value="short sleeve top"></option>
+            <option value="long sleeve top"></option>
+            <option value="short sleeve outwear"></option>
+            <option value="long sleeve outwear"></option>
+            <option value="vest"></option>
+            <option value="sling"></option>
+            <option value="shorts"></option>
+            <option value="trousers"></option>
+            <option value="skirt"></option>
+            <option value="short sleeve dress"></option>
+            <option value="long sleeve dress"></option>
+            <option value="vest dress"></option>
+            <option value="sling dress"></option>
+          </datalist>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          Search
+        </button>
+        {% if current_tag %}
+        <a href="/gallery" class="btn btn-ghost">
+          Clear
+        </a>
+        {% endif %}
+      </form>
+
+      {% if current_tag %}
+      <div class="mt-6 pt-6 border-t border-light">
+        <span class="text-sm text-fog mr-3">Filtering by:</span>
+        <span class="tag">{{ current_tag }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Gallery Grid or Empty State -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-7xl pb-24">
+    {% if images %}
+    <div class="gallery-grid fade-in-up delay-300">
+      {% for image in images %}
+        {{ gallery_card(image) }}
+      {% endfor %}
+    </div>
+    {% else %}
+    <!-- Empty State -->
+    <div class="text-center py-24 fade-in-up delay-300">
+      <svg class="w-24 h-24 mx-auto mb-8 text-fog" fill="none" stroke="currentColor" viewBox="0 0 24 24" opacity="0.5">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+      </svg>
+      <h3 class="text-2xl font-light text-charcoal mb-3">No Images Yet</h3>
+      <p class="text-fog mb-10 text-lg">Upload your first fashion image to get started</p>
+      <a href="/" class="btn btn-primary btn-large">
+        Upload Images
+      </a>
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- Pagination -->
+  {{ render_pagination(current_page, total_pages, '/gallery', current_tag) }}
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+{% endblock %}

@@ -110,7 +110,7 @@ async def gallery(
             "timestamp": img['uploaded_at'].strftime("%Y-%m-%d %H:%M:%S") if img['uploaded_at'] else ""
         })
     
-    return templates.TemplateResponse("gallery.html", {
+    return templates.TemplateResponse("pages/gallery.html", {
         "request": request,
         "images": images,
         "current_page": page,
@@ -178,7 +178,7 @@ async def product_detail(
     # Get original image URL (not output)
     original_url = minio.get_public_url(image['storage_url'], request_host=request.headers.get('host'))
     
-    return templates.TemplateResponse("product-detail.html", {
+    return templates.TemplateResponse("pages/product_detail.html", {
         "request": request,
         "file_id": image_id,
         "original_url": original_url,

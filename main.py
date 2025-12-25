@@ -104,7 +104,7 @@ templates.env.globals.update(APP_VERSION=APP_VERSION)
 # Main UI (home)
 @app.get("/", response_class=None)
 def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("pages/index.html", {"request": request})
 
 
 # Include routers

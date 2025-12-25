@@ -1,0 +1,205 @@
+{% extends "layouts/base.html" %}
+{% from "macros/navigation.html" import render_nav %}
+{% from "macros/stats.html" import stat_card %}
+
+{% block title %}Product Details — Fashion AI Segmentation{% endblock %}
+{% block page_identifier %}product{% endblock %}
+
+{% block extra_styles %}
+/* Staggered tag animations */
+.tag-delay-0 { animation-delay: 0ms; }
+.tag-delay-1 { animation-delay: 50ms; }
+.tag-delay-2 { animation-delay: 100ms; }
+.tag-delay-3 { animation-delay: 150ms; }
+.tag-delay-4 { animation-delay: 200ms; }
+.tag-delay-5 { animation-delay: 250ms; }
+.tag-delay-6 { animation-delay: 300ms; }
+.tag-delay-7 { animation-delay: 350ms; }
+.tag-delay-8 { animation-delay: 400ms; }
+.tag-delay-9 { animation-delay: 450ms; }
+
+/* Canvas container */
+.canvas-container {
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+/* Radio button styling */
+input[type="radio"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #E8E8E8;
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+input[type="radio"]:checked {
+  border-color: #6B8E9E;
+}
+
+input[type="radio"]:checked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #6B8E9E;
+  border-radius: 50%;
+}
+
+input[type="radio"]:hover {
+  border-color: #6B8E9E;
+}
+{% endblock %}
+
+{% block navigation %}
+  {{ render_nav('') }}
+{% endblock %}
+
+{% block content %}
+  <!-- Back Button -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-6xl py-8">
+    <a
+      href="/gallery"
+      class="inline-flex items-center text-dusty-blue hover:text-charcoal transition-colors font-medium fade-in-up"
+    >
+      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+      </svg>
+      Back to Gallery
+    </a>
+  </section>
+
+  <!-- Product Detail -->
+  <section class="container mx-auto px-6 lg:px-12 max-w-6xl pb-24">
+    <div class="card fade-in-up delay-100">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+        <!-- Image Section -->
+        <div class="space-y-6">
+          <div class="canvas-container">
+            <canvas id="productCanvas" class="w-full h-auto"></canvas>
+            <img
+              id="originalImage"
+              src="{{ original_url }}"
+              alt="Original Product"
+              class="hidden"
+            />
+          </div>
+
+          <!-- Display Mode Controls -->
+          <div class="bg-warm-white p-5 rounded-lg border border-light">
+            <p class="text-sm font-medium text-charcoal mb-4">Display Mode</p>
+            <div class="flex items-center gap-6">
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="image"
+                  class="mr-2"
+                />
+                <span class="text-sm text-charcoal">Image</span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="polygon"
+                  checked
+                  class="mr-2"
+                />
+                <span class="text-sm text-charcoal">Polygon</span>
+              </label>
+              <label class="inline-flex items-center cursor-pointer">
+                <input
+                  type="radio"
+                  name="displayMode"
+                  value="rectangle"
+                  class="mr-2"
+                />
+                <span class="text-sm text-charcoal">Rectangle</span>
+              </label>
+            </div>
+          </div>
+
+          <p class="text-sm text-fog text-center">
+            Processed: {{ timestamp }}
+          </p>
+        </div>
+
+        <!-- Details Section -->
+        <div class="space-y-8">
+          <div>
+            <div class="accent-line mb-6"></div>
+            <h2 class="text-3xl lg:text-4xl font-light mb-3 text-charcoal">
+              Product Details
+            </h2>
+            <p class="text-fog text-base">
+              AI-powered clothing segmentation results
+            </p>
+          </div>
+
+          <!-- Statistics Grid -->
+          <div class="grid grid-cols-2 gap-4">
+            {{ stat_card('Objects Detected', object_count, 'primary') }}
+            {{ stat_card('Unique Classes', classes|length, 'secondary') }}
+          </div>
+
+          <!-- Detected Items -->
+          <div>
+            <h3 class="text-xl font-medium text-charcoal mb-4">
+              Detected Items
+            </h3>
+            <div class="flex flex-wrap gap-2">
+              {% if classes %}
+              {% for cls in classes %}
+              <span class="tag fade-in-up tag-delay-{{ loop.index0 % 10 }}">
+                {{ cls }}
+              </span>
+              {% endfor %}
+              {% else %}
+              <p class="text-fog">No items detected</p>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Download Button -->
+          <div class="pt-6 border-t border-light">
+            <button
+              id="downloadBtn"
+              class="btn btn-primary w-full justify-center"
+            >
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+              </svg>
+              Download Image
+            </button>
+          </div>
+
+          <!-- File Info -->
+          <div class="pt-4 border-t border-light">
+            <p class="text-xs text-fog">File ID: {{ file_id }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hidden data for JavaScript -->
+  <script id="detectionsData" type="application/json">
+    {{ detections_json|safe }}
+  </script>
+  <div id="fileId" class="hidden">{{ file_id }}</div>
+  <div id="originalUrl" class="hidden">{{ original_url }}</div>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/static/js/main.js?v={{ APP_VERSION }}"></script>
+{% endblock %}

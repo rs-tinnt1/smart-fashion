@@ -5,7 +5,18 @@
       "Bash(git mv:*)",
       "Bash(git rm:*)",
       "Bash(poetry run pytest:*)",
-      "Bash(poetry run python:*)"
+      "Bash(poetry run python:*)",
+      "Bash(mkdir:*)",
+      "Bash(grep:*)",
+      "Bash(podman-compose up:*)",
+      "Bash(podman ps:*)",
+      "Bash(curl:*)",
+      "Bash(while read file)",
+      "Bash(do echo:*)",
+      "Bash(done:*)",
+      "Bash(for:*)",
+      "Bash(do ls -1 \"$dir\"*.js)",
+      "Bash(tree:*)"
     ]
   }
 }
