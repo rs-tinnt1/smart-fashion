@@ -1,7 +1,7 @@
 """
 Background Worker for Smart Fashion Image Processing
 
-Polls database for pending jobs and processes them using the ONNX model.
+Polls database for pending jobs and processes them using the YOLO model.
 Run: python worker.py [--once]
 """
 
@@ -18,11 +18,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.config import (
-    LOCAL_MODEL_CACHE, MINIO_MODEL_KEY, MINIO_BUCKET, COLORS
+    LOCAL_MODEL_CACHE, MODEL_SEGMENT, S3_BUCKET, COLORS
 )
 from app.services.database_service import get_database, close_database
-from app.services.storage_service import get_minio_service
-from app.services.inference_service import ONNXYOLOSegmentation
+from app.services.storage_service import get_storage_service
+from app.services.inference_service import YOLOSegmentation
 
 
 class Worker:
@@ -30,7 +30,7 @@ class Worker:
     
     def __init__(self):
         self.model = None
-        self.minio = None
+        self.storage = None
         self.db = None
         self.running = True
     
@@ -38,25 +38,24 @@ class Worker:
         """Initialize worker dependencies."""
         print("Initializing worker...")
         
-        # Initialize MinIO
-        self.minio = get_minio_service()
-        self.minio.ensure_bucket_exists()
+        # Initialize storage service
+        self.storage = get_storage_service()
         
         # Download and load model
         LOCAL_MODEL_CACHE.mkdir(parents=True, exist_ok=True)
-        local_model_path = LOCAL_MODEL_CACHE / MINIO_MODEL_KEY
+        local_model_path = LOCAL_MODEL_CACHE / MODEL_SEGMENT
         
         if not local_model_path.exists():
-            print(f"Downloading model from MinIO: {MINIO_BUCKET}/{MINIO_MODEL_KEY}")
-            if not self.minio.download_file(MINIO_MODEL_KEY, local_model_path):
-                raise RuntimeError(f"Failed to download model from MinIO: {MINIO_MODEL_KEY}")
+            print(f"Downloading model from S3: {S3_BUCKET}/{MODEL_SEGMENT}")
+            if not self.storage.download_file(MODEL_SEGMENT, local_model_path):
+                raise RuntimeError(f"Failed to download model from S3: {MODEL_SEGMENT}")
             print(f"Model downloaded to: {local_model_path}")
         else:
             print(f"Using cached model: {local_model_path}")
         
-        print(f"Loading ONNX model from {local_model_path}")
-        self.model = ONNXYOLOSegmentation(str(local_model_path))
-        print("ONNX model loaded successfully")
+        print(f"Loading YOLO model from {local_model_path}")
+        self.model = YOLOSegmentation(str(local_model_path))
+        print("YOLO model loaded successfully")
         
         # Initialize database
         self.db = await get_database()
@@ -85,9 +84,9 @@ class Worker:
         print(f"Processing job {job_id} for image {image_id}")
         
         try:
-            # Download image from MinIO
+            # Download image from storage
             temp_path = Path(f"/tmp/worker_{image_id}.jpg")
-            if not self.minio.download_file(storage_url, temp_path):
+            if not self.storage.download_file(storage_url, temp_path):
                 raise RuntimeError(f"Failed to download image: {storage_url}")
             
             # Load image

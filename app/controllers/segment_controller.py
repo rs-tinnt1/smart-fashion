@@ -3,13 +3,12 @@ from app.services.segmentation_service import segment_one_file, delete_output, g
 from app.services.database_service import get_database, DatabaseService
 from typing import List
 from datetime import datetime
-import uuid
 import json
 
 router = APIRouter()
 
 model = None  # Will be injected by main.py
-minio_service = None  # Will be injected by main.py
+storage_service = None  # Will be injected by main.py
 
 
 def get_model():
@@ -19,11 +18,11 @@ def get_model():
     return model
 
 
-def get_minio():
-    global minio_service
-    if minio_service is None:
-        raise HTTPException(status_code=503, detail="MinIO service not initialized")
-    return minio_service
+def get_storage():
+    global storage_service
+    if storage_service is None:
+        raise HTTPException(status_code=503, detail="Storage service not initialized")
+    return storage_service
 
 
 async def get_db() -> DatabaseService:
@@ -45,7 +44,7 @@ async def segment_clothing(
     request: Request,
     files: List[UploadFile] = File(...),
     yolo_model=Depends(get_model),
-    minio=Depends(get_minio),
+    storage=Depends(get_storage),
     db: DatabaseService = Depends(get_db)
 ):
     if not files:
@@ -70,8 +69,8 @@ async def segment_clothing(
             # Reset file position for segment_one_file
             await file.seek(0)
             
-            # Process image with ONNX model
-            result = segment_one_file(file, yolo_model, minio, base_url, request_host=request.headers.get('host'))
+            # Process image with YOLO model
+            result = segment_one_file(file, yolo_model, storage, base_url, request_host=request.headers.get('host'))
             
             # Save to database
             image_id = result["file_id"]
@@ -144,8 +143,8 @@ async def segment_clothing(
 
 
 @router.delete("/api/outputs/{file_id}")
-async def delete_output_endpoint(file_id: str, minio=Depends(get_minio)):
-    deleted = delete_output(file_id, minio)
+async def delete_output_endpoint(file_id: str, storage=Depends(get_storage)):
+    deleted = delete_output(file_id, storage)
     if not deleted:
         raise HTTPException(status_code=404, detail="Files not found")
     return {"success": True, "deleted": deleted}

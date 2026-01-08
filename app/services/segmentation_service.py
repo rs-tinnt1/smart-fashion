@@ -3,12 +3,12 @@ from pathlib import Path
 import uuid
 import shutil
 import json
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 import cv2
 import numpy as np
 
-from ..config import UPLOAD_DIR, OUTPUT_DIR, COLORS  # will be created later
+from ..config import UPLOAD_DIR, OUTPUT_DIR, COLORS
 
 
 def _save_upload(file_obj, file_id: str) -> Path:
@@ -161,15 +161,21 @@ def _process_one_image(image_path: str, output_prefix: str, model: Any) -> Dict[
     }
 
 
-def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "", request_host: str = None) -> Dict[str, Any]:
-    """Handle a single uploaded file – uploads ORIGINAL image to MinIO.
+def segment_one_file(
+    file_obj,
+    model: Any,
+    storage_service: Any,
+    base_url: str = "",
+    request_host: Optional[str] = None
+) -> Dict[str, Any]:
+    """Handle a single uploaded file – uploads ORIGINAL image to S3/R2.
     
     Args:
         file_obj: Uploaded file object
         model: YOLO model for inference
-        minio_service: MinIO service instance
+        storage_service: S3/R2 storage service instance
         base_url: Base URL of the application
-        request_host: Request host header for dynamic MinIO URLs
+        request_host: Request host header for dynamic URLs
     """
     if not file_obj.content_type.startswith("image/"):
         raise ValueError(f"File {file_obj.filename} is not an image")
@@ -180,19 +186,19 @@ def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "
     try:
         result = _process_one_image(str(input_path), file_id, model)
         
-        # Upload ORIGINAL image to MinIO (not output image)
+        # Upload ORIGINAL image to S3/R2 (not output image)
         original_image_path = Path(result["original_image"])
         original_image_key = f"images/{file_id}{original_image_path.suffix}"
-        minio_service.upload_file(original_image_path, original_image_key, content_type="image/jpeg")
+        storage_service.upload_file(original_image_path, original_image_key, content_type="image/jpeg")
         
-        # Upload JSON data to MinIO
+        # Upload JSON data to S3/R2
         json_file_path = Path(result["json_file"])
         json_key = f"outputs/{file_id}_data.json"
-        minio_service.upload_file(json_file_path, json_key, content_type="application/json")
+        storage_service.upload_file(json_file_path, json_key, content_type="application/json")
         
         # Get public URLs
-        original_image_url = minio_service.get_public_url(original_image_key, request_host=request_host)
-        json_url = minio_service.get_public_url(json_key, request_host=request_host)
+        original_image_url = storage_service.get_public_url(original_image_key, request_host=request_host)
+        json_url = storage_service.get_public_url(json_key, request_host=request_host)
         
         # Clean up local files
         json_file_path.unlink(missing_ok=True)
@@ -209,16 +215,16 @@ def segment_one_file(file_obj, model: Any, minio_service: Any, base_url: str = "
         _delete_input(input_path)
 
 
-def delete_output(file_id: str, minio_service: Any) -> List[str]:
-    """Delete output files for a given file_id from MinIO."""
+def delete_output(file_id: str, storage_service: Any) -> List[str]:
+    """Delete output files for a given file_id from S3/R2."""
     output_img_key = f"outputs/{file_id}_output.jpg"
     output_json_key = f"outputs/{file_id}_data.json"
     deleted = []
-    if minio_service.object_exists(output_img_key):
-        minio_service.delete_object(output_img_key)
+    if storage_service.object_exists(output_img_key):
+        storage_service.delete_object(output_img_key)
         deleted.append("image")
-    if minio_service.object_exists(output_json_key):
-        minio_service.delete_object(output_json_key)
+    if storage_service.object_exists(output_json_key):
+        storage_service.delete_object(output_json_key)
         deleted.append("json")
     return deleted
 

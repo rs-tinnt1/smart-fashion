@@ -7,14 +7,10 @@ Provides gallery page and API endpoints for viewing processed images.
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from typing import List
-from datetime import datetime
 import json
 
 from app.services.database_service import get_database, DatabaseService
-from app.services.storage_service import get_minio_service
-from app.models.image_schema import ImageSummary
-from app.models.detection_schema import DetectionSummary, BBox
+from app.services.storage_service import get_storage_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -25,9 +21,9 @@ async def get_db() -> DatabaseService:
     return await get_database()
 
 
-def get_minio():
-    """Dependency to get MinIO service."""
-    return get_minio_service()
+def get_storage():
+    """Dependency to get storage service."""
+    return get_storage_service()
 
 
 @router.get("/gallery", response_class=HTMLResponse)
@@ -36,7 +32,7 @@ async def gallery(
     page: int = 1,
     tag: str = None,
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio)
+    storage=Depends(get_storage)
 ):
     """
     Render gallery page with images from database.
@@ -100,7 +96,7 @@ async def gallery(
         class_names = [d['label'] for d in detections]
         
         # Use original image URL (not output)
-        original_url = minio.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
+        original_url = storage.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
         
         images.append({
             "file_id": img['id'],
@@ -126,7 +122,7 @@ async def product_detail(
     request: Request,
     image_id: str,
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio)
+    storage=Depends(get_storage)
 ):
     """
     Render product detail page for a specific image.
@@ -176,7 +172,7 @@ async def product_detail(
         detections_data.append(detection)
     
     # Get original image URL (not output)
-    original_url = minio.get_public_url(image['storage_url'], request_host=request.headers.get('host'))
+    original_url = storage.get_public_url(image['storage_url'], request_host=request.headers.get('host'))
     
     return templates.TemplateResponse("pages/product_detail.html", {
         "request": request,
@@ -196,7 +192,7 @@ async def product_detail(
 async def api_gallery(
     request: Request,
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio),
+    storage=Depends(get_storage),
     limit: int = 50
 ):
     """
@@ -224,11 +220,11 @@ async def api_gallery(
         )
         
         # Get public URLs
-        original_url = minio.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
+        original_url = storage.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
         output_key = f"outputs/{img['id']}_output.jpg"
         output_url = None
-        if minio.object_exists(output_key):
-            output_url = minio.get_public_url(output_key, request_host=request.headers.get('host'))
+        if storage.object_exists(output_key):
+            output_url = storage.get_public_url(output_key, request_host=request.headers.get('host'))
         
         result.append({
             "id": img['id'],
@@ -262,7 +258,7 @@ async def api_gallery(
 async def api_gallery_image(
     image_id: str,
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio)
+    storage=Depends(get_storage)
 ):
     """
     Get detailed info for a specific image including all detections with polygons.
@@ -282,9 +278,9 @@ async def api_gallery_image(
     )
     
     # Get URLs
-    original_url = minio.get_presigned_url(image['storage_url'])
+    original_url = storage.get_presigned_url(image['storage_url'])
     output_key = f"outputs/{image_id}_output.jpg"
-    output_url = minio.get_presigned_url(output_key) if minio.object_exists(output_key) else None
+    output_url = storage.get_presigned_url(output_key) if storage.object_exists(output_key) else None
     
     return {
         "id": image['id'],

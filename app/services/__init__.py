@@ -7,14 +7,14 @@ Contains business logic and infrastructure services.
 # Database service
 from app.services.database_service import get_database, close_database, DatabaseService
 
-# Storage service (MinIO/S3)
-from app.services.storage_service import get_minio_service, MinIOService
+# Storage service (S3/R2)
+from app.services.storage_service import get_storage_service, StorageService
 
 # Segmentation service
 from app.services.segmentation_service import segment_one_file, delete_output, get_stats
 
-# Inference service (ONNX)
-from app.services.inference_service import ONNXYOLOSegmentation
+# Inference service (YOLO)
+from app.services.inference_service import YOLOSegmentation
 
 __all__ = [
     # Database
@@ -22,12 +22,12 @@ __all__ = [
     "close_database",
     "DatabaseService",
     # Storage
-    "get_minio_service",
-    "MinIOService",
+    "get_storage_service",
+    "StorageService",
     # Segmentation
     "segment_one_file",
     "delete_output",
     "get_stats",
     # Inference
-    "ONNXYOLOSegmentation",
+    "YOLOSegmentation",
 ]

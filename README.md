@@ -4,70 +4,144 @@ FastAPI application for clothing segmentation using YOLOv8 with ONNX Runtime.
 
 ## Quick Start
 
+### Using Makefile (Recommended)
+
+```bash
+# Show all available commands
+make help
+
+# Install dependencies
+make install
+
+# Run development server
+make dev
+
+# Run tests
+make test
+```
+
 ### Local Development (Poetry)
 
 ```bash
 # Install dependencies
-poetry install
+make install
+# or: poetry install
 
 # Run development server
-poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
+make dev
+# or: poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
 
 # Run tests
-poetry run pytest
+make test
+# or: poetry run pytest
 ```
 
 ### Docker Development
 
-- Docker command
+```bash
+# Start all services
+make docker-up
+
+# View logs
+make docker-logs
+
+# Stop services
+make docker-down
+```
+
+Or using docker-compose directly:
 
 ```bash
 docker-compose up -d
-
 docker-compose logs -f app
 ```
 
-- Podman command
+### Podman Development
+
+```bash
+# Start all services
+make podman-up
+
+# View logs
+make podman-logs
+
+# Stop services
+make podman-down
+```
+
+Or using podman-compose directly:
 
 ```bash
 podman-compose up -d
-
 podman-compose logs -f app
 ```
 
 ### Production Deployment
 
-- Docker command
+```bash
+# Build and deploy
+make prod-up
+
+# Stop production
+make prod-down
+```
+
+Or manually:
 
 ```bash
 podman build -t smartfashion:latest .
 podman-compose -f compose.prod.yml up -d
 ```
 
-- Podman command
+## Makefile Commands
 
-```bash
-podman build -t smartfashion:latest .
-podman-compose -f compose.prod.yml up -d
-```
+| Command | Description |
+| --- | --- |
+| `make help` | Show all available commands |
+| `make install` | Install dependencies with Poetry |
+| `make dev` | Start development server |
+| `make test` | Run all tests |
+| `make test-cov` | Run tests with coverage |
+| `make test-level1` | Run infrastructure tests |
+| `make test-level2` | Run service tests |
+| `make test-level3` | Run API tests |
+| `make test-level4` | Run UI tests |
+| `make format` | Format code with ruff |
+| `make lint` | Lint code with ruff |
+| `make fix` | Fix linting issues |
+| `make docker-up` | Start all services (Docker) |
+| `make docker-down` | Stop services (Docker) |
+| `make docker-logs` | Follow app logs (Docker) |
+| `make docker-build` | Rebuild app container |
+| `make podman-up` | Start all services (Podman) |
+| `make podman-down` | Stop services (Podman) |
+| `make podman-logs` | Follow app logs (Podman) |
+| `make podman-build` | Build image with Podman |
+| `make prod-up` | Deploy production |
+| `make prod-down` | Stop production |
+| `make db-shell` | Open MariaDB shell |
+| `make db-reset` | Reset database (removes all data) |
+| `make minio-ls` | List files in MinIO bucket |
+| `make minio-policy` | Set bucket policy to public |
+| `make clean` | Remove cache and temp files |
 
 ## API Endpoints
 
-| Endpoint       | Method | Description                    |
-| -------------- | ------ | ------------------------------ |
-| `/`            | GET    | Web UI                         |
-| `/api/segment` | POST   | Upload images for segmentation |
-| `/api/health`  | GET    | Health check                   |
-| `/gallery`     | GET    | Image gallery                  |
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/` | GET | Web UI |
+| `/api/segment` | POST | Upload images for segmentation |
+| `/api/health` | GET | Health check |
+| `/gallery` | GET | Image gallery |
 
 ## Configuration
 
-| Variable          | Default                       | Description          |
-| ----------------- | ----------------------------- | -------------------- |
-| `UVICORN_WORKERS` | 1                             | Number of workers    |
-| `UVICORN_PORT`    | 8000                          | Server port          |
-| `OMP_NUM_THREADS` | 4                             | CPU threads for ONNX |
-| `MINIO_MODEL_KEY` | deepfashion2_yolov8s-seg.onnx | Model file in MinIO  |
+| Variable | Default | Description |
+| --- | --- | --- |
+| `UVICORN_WORKERS` | 1 | Number of workers |
+| `UVICORN_PORT` | 8000 | Server port |
+| `OMP_NUM_THREADS` | 4 | CPU threads for ONNX |
+| `MINIO_MODEL_KEY` | deepfashion2_yolov8s-seg.onnx | Model file in MinIO |
 
 ## Project Structure
 
@@ -100,6 +174,7 @@ podman-compose -f compose.prod.yml up -d
 ├── Dockerfile                          # Production container image
 ├── compose.yml                         # Development environment
 ├── compose.prod.yml                    # Production environment
+├── Makefile                            # Simplified commands
 ├── pyproject.toml                      # Poetry dependencies
 └── poetry.lock                         # Locked dependency versions
 ```
@@ -142,21 +217,27 @@ from app.controllers import segment_router, gallery_router, upload_router
 
 ```bash
 # Run all tests
-poetry run pytest
+make test
 
 # Run with coverage
-poetry run pytest --cov=app
+make test-cov
 
 # Run specific test level
-poetry run pytest tests/test_level1_infrastructure.py -v
+make test-level1
+make test-level2
+make test-level3
+make test-level4
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-poetry run ruff format .
+make format
 
 # Lint code
-poetry run ruff check .
+make lint
+
+# Fix linting issues
+make fix
 ```

@@ -1,65 +1,70 @@
 """
-MinIO Service for Smart Fashion Application
+S3 Storage Service for Smart Fashion Application
 
-Provides real MinIO client for storing/retrieving images and models.
+Provides S3-compatible client for storing/retrieving images and models.
+Works with Cloudflare R2, AWS S3, MinIO, and other S3-compatible services.
 """
 
 import io
 from pathlib import Path
-from typing import Optional, BinaryIO
-from minio import Minio
-from minio.error import S3Error
-from urllib.parse import urlparse
+from typing import Optional
+
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
 
 from app.config import (
-    MINIO_ENDPOINT,
-    MINIO_ROOT_USER,
-    MINIO_ROOT_PASSWORD,
-    MINIO_BUCKET,
-    MINIO_REGION,
-    MINIO_SECURE,
-    MINIO_EXTERNAL_ENDPOINT,
+    S3_ENDPOINT,
+    S3_ACCESS_KEY_ID,
+    S3_SECRET_ACCESS_KEY,
+    S3_BUCKET,
+    S3_REGION,
 )
 
 
-class MinIOService:
-    """MinIO client wrapper for file storage operations."""
-    
-    _instance: Optional["MinIOService"] = None
-    
+class StorageService:
+    """S3-compatible client wrapper for file storage operations."""
+
+    _instance: Optional["StorageService"] = None
+
     def __init__(self):
-        # Parse endpoint to get host:port
-        endpoint = MINIO_ENDPOINT.replace("http://", "").replace("https://", "")
-        
-        self.client = Minio(
-            endpoint,
-            access_key=MINIO_ROOT_USER,
-            secret_key=MINIO_ROOT_PASSWORD,
-            secure=MINIO_SECURE,
-            region=MINIO_REGION,
+        # Configure boto3 for S3-compatible services (like R2)
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=S3_ENDPOINT,
+            aws_access_key_id=S3_ACCESS_KEY_ID,
+            aws_secret_access_key=S3_SECRET_ACCESS_KEY,
+            region_name=S3_REGION,
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+            ),
         )
-        self.default_bucket = MINIO_BUCKET
-        print(f"MinIO client initialized: {endpoint}")
-    
+        self.default_bucket = S3_BUCKET
+        print(f"S3 client initialized: {S3_ENDPOINT}")
+
     @classmethod
-    def get_instance(cls) -> "MinIOService":
-        """Get singleton instance of MinIOService."""
+    def get_instance(cls) -> "StorageService":
+        """Get singleton instance of StorageService."""
         if cls._instance is None:
-            cls._instance = MinIOService()
+            cls._instance = StorageService()
         return cls._instance
-    
+
     def ensure_bucket_exists(self, bucket_name: Optional[str] = None) -> bool:
-        """Create bucket if it doesn't exist."""
+        """Check if bucket exists (R2 doesn't support create_bucket via API)."""
         bucket = bucket_name or self.default_bucket
         try:
-            if not self.client.bucket_exists(bucket):
-                self.client.make_bucket(bucket, location=MINIO_REGION)
-                print(f"Created bucket: {bucket}")
+            self.client.head_bucket(Bucket=bucket)
+            print(f"Bucket exists: {bucket}")
             return True
-        except S3Error as e:
-            print(f"Error ensuring bucket exists: {e}")
+        except ClientError as e:
+            error_code = e.response.get("Error", {}).get("Code", "")
+            if error_code == "404":
+                print(f"Bucket not found: {bucket}. Please create it in Cloudflare dashboard.")
+            else:
+                print(f"Error checking bucket: {e}")
             return False
-    
+
     def upload_file(
         self,
         local_path: str | Path,
@@ -67,21 +72,25 @@ class MinIOService:
         bucket_name: Optional[str] = None,
         content_type: Optional[str] = None,
     ) -> bool:
-        """Upload a file from local path to MinIO."""
+        """Upload a file from local path to S3/R2."""
         bucket = bucket_name or self.default_bucket
+        extra_args = {}
+        if content_type:
+            extra_args["ContentType"] = content_type
+
         try:
-            self.client.fput_object(
+            self.client.upload_file(
+                str(local_path),
                 bucket,
                 object_name,
-                str(local_path),
-                content_type=content_type,
+                ExtraArgs=extra_args if extra_args else None,
             )
             print(f"Uploaded {local_path} -> {bucket}/{object_name}")
             return True
-        except S3Error as e:
+        except ClientError as e:
             print(f"Error uploading file: {e}")
             return False
-    
+
     def upload_bytes(
         self,
         data: bytes,
@@ -89,43 +98,42 @@ class MinIOService:
         content_type: str = "application/octet-stream",
         bucket_name: Optional[str] = None,
     ) -> bool:
-        """Upload bytes directly to MinIO."""
+        """Upload bytes directly to S3/R2."""
         bucket = bucket_name or self.default_bucket
         try:
             self.client.put_object(
-                bucket,
-                object_name,
-                io.BytesIO(data),
-                length=len(data),
-                content_type=content_type,
+                Bucket=bucket,
+                Key=object_name,
+                Body=io.BytesIO(data),
+                ContentType=content_type,
             )
             print(f"Uploaded {len(data)} bytes -> {bucket}/{object_name}")
             return True
-        except S3Error as e:
+        except ClientError as e:
             print(f"Error uploading bytes: {e}")
             return False
-    
+
     def download_file(
         self,
         object_name: str,
         local_path: str | Path,
         bucket_name: Optional[str] = None,
     ) -> bool:
-        """Download a file from MinIO to local path."""
+        """Download a file from S3/R2 to local path."""
         bucket = bucket_name or self.default_bucket
         local_path = Path(local_path)
-        
+
         # Create parent directories
         local_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         try:
-            self.client.fget_object(bucket, object_name, str(local_path))
+            self.client.download_file(bucket, object_name, str(local_path))
             print(f"Downloaded {bucket}/{object_name} -> {local_path}")
             return True
-        except S3Error as e:
+        except ClientError as e:
             print(f"Error downloading file: {e}")
             return False
-    
+
     def get_presigned_url(
         self,
         object_name: str,
@@ -133,27 +141,18 @@ class MinIOService:
         expires_hours: int = 24,
     ) -> Optional[str]:
         """Get a presigned URL for accessing an object."""
-        from datetime import timedelta
         bucket = bucket_name or self.default_bucket
         try:
-            url = self.client.presigned_get_object(
-                bucket,
-                object_name,
-                expires=timedelta(hours=expires_hours),
+            url = self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": bucket, "Key": object_name},
+                ExpiresIn=expires_hours * 3600,
             )
-            # Replace internal endpoint with external one for browser access
-            internal_endpoint = MINIO_ENDPOINT.replace("http://", "").replace("https://", "")
-            external_endpoint = MINIO_EXTERNAL_ENDPOINT.replace("http://", "").replace("https://", "")
-            if internal_endpoint != external_endpoint:
-                # Determine protocol from external endpoint
-                protocol = "https://" if MINIO_EXTERNAL_ENDPOINT.startswith("https://") else "http://"
-                url = url.replace(f"http://{internal_endpoint}", f"{protocol}{external_endpoint}")
-                url = url.replace(f"https://{internal_endpoint}", f"{protocol}{external_endpoint}")
             return url
-        except S3Error as e:
+        except ClientError as e:
             print(f"Error generating presigned URL: {e}")
             return None
-    
+
     def get_public_url(
         self,
         object_name: str,
@@ -162,58 +161,48 @@ class MinIOService:
     ) -> str:
         """
         Get a direct public URL for accessing an object.
-        Use this for public buckets where presigned signatures are not needed.
-        
+        For R2, this requires a custom domain or R2.dev subdomain to be configured.
+
         Args:
-            object_name: Object key in MinIO
+            object_name: Object key in S3/R2
             bucket_name: Optional bucket (defaults to configured bucket)
-            request_host: Optional host from request header for dynamic URL.
-                         If provided, URL will use this host instead of MINIO_EXTERNAL_ENDPOINT.
-                         Format: "hostname:port" or just "hostname"
+            request_host: Optional host from request header (not used for R2)
         """
         bucket = bucket_name or self.default_bucket
-        
-        if request_host:
-            # Use request host for dynamic URL (enables network access)
-            # Determine protocol from external endpoint config
-            protocol = "https://" if MINIO_EXTERNAL_ENDPOINT.startswith("https://") else "http://"
-            # Extract just the host part (without port) and use MinIO port
-            host_only = request_host.split(':')[0]
-            return f"{protocol}{host_only}:9000/{bucket}/{object_name}"
-        
-        # Fallback to configured external endpoint
-        return f"{MINIO_EXTERNAL_ENDPOINT}/{bucket}/{object_name}"
-    
+        # For R2, construct URL using the endpoint
+        # Note: For public access, you need to configure R2 public bucket or custom domain
+        return f"{S3_ENDPOINT}/{bucket}/{object_name}"
+
     def object_exists(
         self,
         object_name: str,
         bucket_name: Optional[str] = None,
     ) -> bool:
-        """Check if an object exists in MinIO."""
+        """Check if an object exists in S3/R2."""
         bucket = bucket_name or self.default_bucket
         try:
-            self.client.stat_object(bucket, object_name)
+            self.client.head_object(Bucket=bucket, Key=object_name)
             return True
-        except S3Error:
+        except ClientError:
             return False
-    
+
     def delete_object(
         self,
         object_name: str,
         bucket_name: Optional[str] = None,
     ) -> bool:
-        """Delete an object from MinIO."""
+        """Delete an object from S3/R2."""
         bucket = bucket_name or self.default_bucket
         try:
-            self.client.remove_object(bucket, object_name)
+            self.client.delete_object(Bucket=bucket, Key=object_name)
             print(f"Deleted {bucket}/{object_name}")
             return True
-        except S3Error as e:
+        except ClientError as e:
             print(f"Error deleting object: {e}")
             return False
 
 
 # Convenient function to get service instance
-def get_minio_service() -> MinIOService:
-    """Get the MinIO service singleton instance."""
-    return MinIOService.get_instance()
+def get_storage_service() -> StorageService:
+    """Get the storage service singleton instance."""
+    return StorageService.get_instance()

@@ -17,7 +17,7 @@ from app.models.image_schema import ImageResponse
 from app.models.detection_schema import DetectionDetail, DetectionSummary, BBox, PolygonData, PolygonPoint
 from app.models.job_schema import JobStatus
 from app.services.database_service import get_database, DatabaseService
-from app.services.storage_service import get_minio_service
+from app.services.storage_service import get_storage_service
 
 router = APIRouter(tags=["upload"])
 
@@ -27,24 +27,24 @@ async def get_db() -> DatabaseService:
     return await get_database()
 
 
-def get_minio():
-    """Dependency to get MinIO service."""
-    minio = get_minio_service()
-    if minio is None:
-        raise HTTPException(status_code=503, detail="MinIO service not initialized")
-    return minio
+def get_storage():
+    """Dependency to get storage service."""
+    storage = get_storage_service()
+    if storage is None:
+        raise HTTPException(status_code=503, detail="Storage service not initialized")
+    return storage
 
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_image(
     file: UploadFile = File(...),
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio)
+    storage=Depends(get_storage)
 ):
     """
     Upload an image for processing.
     
-    - Stores the image in MinIO
+    - Stores the image in S3/R2 storage
     - Creates image record in database
     - Creates a pending job for processing
     - Returns immediately with job_id and image_id
@@ -75,8 +75,8 @@ async def upload_image(
     ext = Path(file.filename).suffix if file.filename else ".jpg"
     storage_key = f"uploads/{image_id}{ext}"
     
-    # Upload to MinIO
-    if not minio.upload_bytes(content, storage_key, content_type=file.content_type):
+    # Upload to storage
+    if not storage.upload_bytes(content, storage_key, content_type=file.content_type):
         raise HTTPException(status_code=500, detail="Failed to upload file to storage")
     
     # Get image dimensions (optional, will be updated by worker)
@@ -116,7 +116,7 @@ async def upload_image(
 async def get_image(
     image_id: str,
     db: DatabaseService = Depends(get_db),
-    minio = Depends(get_minio)
+    storage=Depends(get_storage)
 ):
     """
     Get image metadata and detections summary.
@@ -141,7 +141,7 @@ async def get_image(
         ))
     
     # Get presigned URL for storage
-    storage_url = minio.get_presigned_url(image['storage_url']) or image['storage_url']
+    storage_url = storage.get_presigned_url(image['storage_url']) or image['storage_url']
     
     return ImageResponse(
         id=image['id'],

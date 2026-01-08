@@ -15,13 +15,11 @@ os.environ.setdefault("DB_PORT", "3306")
 os.environ.setdefault("DB_USER", "smartfashion")
 os.environ.setdefault("DB_PASSWORD", "smartfashion")
 os.environ.setdefault("DB_NAME", "smartfashion")
-os.environ.setdefault("MINIO_ENDPOINT", "http://localhost:9000")
-os.environ.setdefault("MINIO_EXTERNAL_ENDPOINT", "http://localhost:9000")
-os.environ.setdefault("MINIO_ROOT_USER", "admin")
-os.environ.setdefault("MINIO_ROOT_PASSWORD", "admin123456")
-os.environ.setdefault("MINIO_BUCKET", "smartfashion")
-os.environ.setdefault("MINIO_REGION", "us-east-1")
-os.environ.setdefault("MINIO_SECURE", "false")
+os.environ.setdefault("S3_ENDPOINT", "https://test.r2.cloudflarestorage.com")
+os.environ.setdefault("S3_ACCESS_KEY_ID", "test")
+os.environ.setdefault("S3_SECRET_ACCESS_KEY", "test")
+os.environ.setdefault("S3_BUCKET", "smartfashion")
+os.environ.setdefault("S3_REGION", "auto")
 
 
 @pytest.fixture(scope="session")
@@ -52,15 +50,9 @@ def base_url():
 
 
 @pytest.fixture(scope="session")
-def minio_url():
-    """MinIO URL for direct access tests."""
-    return "http://localhost:9000"
-
-
-@pytest.fixture(scope="session")
-def minio_console_url():
-    """MinIO Console URL."""
-    return "http://localhost:9001"
+def s3_endpoint():
+    """S3/R2 endpoint for direct access tests."""
+    return os.getenv("S3_ENDPOINT", "https://test.r2.cloudflarestorage.com")
 
 
 @pytest.fixture
@@ -76,11 +68,11 @@ def db_credentials():
 
 
 @pytest.fixture
-def minio_credentials():
-    """MinIO credentials for testing."""
+def s3_credentials():
+    """S3/R2 credentials for testing."""
     return {
-        "endpoint": os.getenv("MINIO_ENDPOINT", "http://localhost:9000"),
-        "access_key": os.getenv("MINIO_ROOT_USER", "admin"),
-        "secret_key": os.getenv("MINIO_ROOT_PASSWORD", "admin123456"),
-        "bucket": os.getenv("MINIO_BUCKET", "smartfashion"),
+        "endpoint": os.getenv("S3_ENDPOINT", "https://test.r2.cloudflarestorage.com"),
+        "access_key": os.getenv("S3_ACCESS_KEY_ID", "test"),
+        "secret_key": os.getenv("S3_SECRET_ACCESS_KEY", "test"),
+        "bucket": os.getenv("S3_BUCKET", "smartfashion"),
     }

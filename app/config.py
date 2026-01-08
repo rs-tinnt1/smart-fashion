@@ -7,8 +7,7 @@ load_dotenv()
 APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 
 # Model paths
-ONNX_MODEL_PATH = os.getenv("ONNX_MODEL_PATH", "models/deepfashion2_yolov8s-seg.onnx")
-MINIO_MODEL_KEY = os.getenv("MINIO_MODEL_KEY", "deepfashion2_yolov8s-seg.onnx")
+MODEL_SEGMENT = os.getenv("MODEL_SEGMENT", "yolo11m-seg.pt")
 LOCAL_MODEL_CACHE = Path(os.getenv("LOCAL_MODEL_CACHE", "/tmp/models"))
 
 UPLOAD_DIR = Path("uploads")
@@ -22,15 +21,12 @@ DB_USER = os.getenv("DB_USER", "smartfashion")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "smartfashion")
 DB_NAME = os.getenv("DB_NAME", "smartfashion")
 
-# MinIO config
-MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
-MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER", "admin")
-MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD", "admin123456")
-MINIO_BUCKET = os.getenv("MINIO_BUCKET", "smartfashion")
-MINIO_REGION = os.getenv("MINIO_REGION", "us-east-1")
-MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
-# External endpoint for presigned URLs (browser-accessible)
-MINIO_EXTERNAL_ENDPOINT = os.getenv("MINIO_EXTERNAL_ENDPOINT", "http://localhost:9000")
+# S3/R2 config (Cloudflare R2 is S3-compatible)
+S3_ENDPOINT = os.getenv("S3_ENDPOINT", "https://account.r2.cloudflarestorage.com")
+S3_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID", "")
+S3_SECRET_ACCESS_KEY = os.getenv("S3_SECRET_ACCESS_KEY", "")
+S3_BUCKET = os.getenv("S3_BUCKET", "smartfashion")
+S3_REGION = os.getenv("S3_REGION", "auto")  # R2 uses 'auto' for region
 
 COLORS = [
     (0, 255, 0), (255, 0, 0), (0, 0, 255), (255, 255, 0),

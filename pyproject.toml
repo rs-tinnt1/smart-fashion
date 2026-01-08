@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "smart-fashion"
 version = "2.0.0"
-description = "FastAPI application for clothing segmentation using YOLOv8 with ONNX Runtime"
+description = "FastAPI application for clothing segmentation using YOLO with PyTorch"
 authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
 license = "MIT"
@@ -14,8 +14,8 @@ fastapi = "^0.115.0"
 uvicorn = {extras = ["standard"], version = "^0.32.0"}
 python-multipart = "^0.0.20"
 jinja2 = "^3.1.0"
-# ONNX Runtime
-onnxruntime = ">=1.17.0"
+# YOLO/PyTorch
+ultralytics = "^8.3.0"
 # CV Libraries
 opencv-python-headless = "^4.10.0"
 numpy = "^2.0.0"
@@ -25,7 +25,8 @@ aiofiles = "^24.1.0"
 python-dotenv = "^1.0.0"
 # Database
 aiomysql = "^0.2.0"
-minio = "^7.2.0"
+# S3/R2 Storage
+boto3 = "^1.35.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.0.0"

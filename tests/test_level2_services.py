@@ -1,7 +1,7 @@
 """
 Level 2: Service Layer Tests
 
-Tests for DatabaseService and MinIOService.
+Tests for DatabaseService and StorageService.
 These tests verify that the service layer properly interacts with infrastructure.
 """
 
@@ -138,75 +138,59 @@ class TestDatabaseService:
         assert polygon_id is not None, "Polygon ID should be returned"
 
 
-class TestMinIOService:
-    """INT-SVC-003 & INT-SVC-004: MinIOService Tests"""
+class TestStorageService:
+    """INT-SVC-003 & INT-SVC-004: StorageService Tests (S3/R2)"""
 
     @pytest.mark.level2
-    def test_minio_service_initialization(self):
-        """INT-SVC-003: Verify MinIO service initializes."""
-        from app.services.storage_service import get_minio_service
+    def test_storage_service_initialization(self):
+        """INT-SVC-003: Verify storage service initializes."""
+        from app.services.storage_service import get_storage_service
         
-        minio = get_minio_service()
-        assert minio is not None, "MinIO service should be initialized"
-        assert minio.client is not None, "MinIO client should be created"
+        storage = get_storage_service()
+        assert storage is not None, "Storage service should be initialized"
+        assert storage.client is not None, "S3 client should be created"
 
     @pytest.mark.level2
-    def test_minio_bucket_exists(self):
-        """INT-SVC-003: Verify bucket exists or can be created."""
-        from app.services.storage_service import get_minio_service
+    def test_storage_presigned_url_format(self):
+        """INT-SVC-004: Verify presigned URL generation works."""
+        from app.services.storage_service import get_storage_service
         
-        minio = get_minio_service()
-        # Just check if client can list bucket - don't try to create
-        try:
-            exists = minio.client.bucket_exists(minio.default_bucket)
-            # Bucket exists or doesn't - both are valid for this test
-            assert True
-        except Exception as e:
-            pytest.fail(f"MinIO connection failed: {e}")
-
-    @pytest.mark.level2
-    def test_minio_presigned_url_format(self):
-        """INT-SVC-004: Verify presigned URL uses localhost, not minio."""
-        from app.services.storage_service import get_minio_service
+        storage = get_storage_service()
         
-        minio = get_minio_service()
-        
-        # Use an existing object path format (don't need actual object for URL generation test)
+        # Use a test object path format (don't need actual object for URL generation test)
         test_key = "test/presigned_test.txt"
         
         # Get presigned URL (will work even if object doesn't exist - it's just signing)
-        url = minio.get_presigned_url(test_key)
+        url = storage.get_presigned_url(test_key)
         
         assert url is not None, "Presigned URL should be generated"
-        assert "localhost:9000" in url, f"URL should use localhost:9000, got: {url}"
-        assert "minio:9000" not in url, f"URL should NOT use minio:9000, got: {url}"
+        # R2 URLs should contain the bucket name and object key
+        assert test_key in url, f"URL should contain object key, got: {url}"
 
     @pytest.mark.level2
     @pytest.mark.slow
-    def test_minio_upload_and_access(self):
-        """INT-SVC-003 & INT-SVC-004: Test upload and presigned URL access."""
+    @pytest.mark.skipif(True, reason="Requires valid S3/R2 credentials - run manually")
+    def test_storage_upload_and_download(self, s3_credentials):
+        """INT-SVC-003 & INT-SVC-004: Test upload and download with real credentials."""
         import httpx
-        from app.services.storage_service import get_minio_service
+        from app.services.storage_service import get_storage_service
         
-        minio = get_minio_service()
-        
-        # First ensure bucket exists
-        minio.ensure_bucket_exists()
+        storage = get_storage_service()
         
         # Upload a test object
         test_data = b"Test content for accessibility check"
         test_key = f"test/accessible_test_{uuid.uuid4()}.txt"
         
-        result = minio.upload_bytes(test_data, test_key)
+        result = storage.upload_bytes(test_data, test_key)
         if not result:
-            pytest.skip("Could not upload to MinIO - may be permission issue")
+            pytest.skip("Could not upload to S3/R2 - may be permission issue")
         
         # Get presigned URL
-        url = minio.get_presigned_url(test_key)
+        url = storage.get_presigned_url(test_key)
         
         # Test accessibility
         response = httpx.get(url, timeout=10.0)
         assert response.status_code == 200, f"URL should be accessible, got: {response.status_code}"
         
         # Cleanup
-        minio.delete_object(test_key)
+        storage.delete_object(test_key)
