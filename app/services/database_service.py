@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 import uuid
 from datetime import datetime
 
-from app.config import DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+from app.config import DB_URL, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 
 
 class DatabaseService:

@@ -8,13 +8,10 @@ import pytest
 import asyncio
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 # Set environment variables for testing
-os.environ.setdefault("DB_HOST", "localhost")
-os.environ.setdefault("DB_PORT", "3306")
-os.environ.setdefault("DB_USER", "smartfashion")
-os.environ.setdefault("DB_PASSWORD", "smartfashion")
-os.environ.setdefault("DB_NAME", "smartfashion")
+os.environ.setdefault("DB_URL", "mysql://smartfashion:smartfashion@localhost:3306/smartfashion")
 os.environ.setdefault("S3_ENDPOINT", "https://test.r2.cloudflarestorage.com")
 os.environ.setdefault("S3_ACCESS_KEY_ID", "test")
 os.environ.setdefault("S3_SECRET_ACCESS_KEY", "test")
@@ -57,13 +54,15 @@ def s3_endpoint():
 
 @pytest.fixture
 def db_credentials():
-    """Database credentials for testing."""
+    """Database credentials for testing (parsed from DB_URL)."""
+    db_url = os.getenv("DB_URL", "mysql://smartfashion:smartfashion@localhost:3306/smartfashion")
+    parsed = urlparse(db_url)
     return {
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": int(os.getenv("DB_PORT", "3306")),
-        "user": os.getenv("DB_USER", "smartfashion"),
-        "password": os.getenv("DB_PASSWORD", "smartfashion"),
-        "database": os.getenv("DB_NAME", "smartfashion"),
+        "host": parsed.hostname or "localhost",
+        "port": parsed.port or 3306,
+        "user": parsed.username or "smartfashion",
+        "password": parsed.password or "smartfashion",
+        "database": parsed.path.lstrip("/") or "smartfashion",
     }
 
 

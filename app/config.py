@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,12 +15,14 @@ UPLOAD_DIR = Path("uploads")
 OUTPUT_DIR = Path("outputs")
 STATIC_DIR = Path("static")
 
-# DB settings (MariaDB)
-DB_HOST = os.getenv("DB_HOST", "mariadb")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
-DB_USER = os.getenv("DB_USER", "smartfashion")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "smartfashion")
-DB_NAME = os.getenv("DB_NAME", "smartfashion")
+# DB settings (MariaDB/MySQL) - parse from connection string
+DB_URL = os.getenv("DB_URL", "mysql://smartfashion:smartfashion@localhost:3306/smartfashion")
+_parsed_db = urlparse(DB_URL)
+DB_HOST = _parsed_db.hostname or "localhost"
+DB_PORT = _parsed_db.port or 3306
+DB_USER = _parsed_db.username or "smartfashion"
+DB_PASSWORD = _parsed_db.password or "smartfashion"
+DB_NAME = _parsed_db.path.lstrip("/") or "smartfashion"
 
 # S3/R2 config (Cloudflare R2 is S3-compatible)
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "https://account.r2.cloudflarestorage.com")

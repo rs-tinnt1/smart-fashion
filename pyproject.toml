@@ -27,6 +27,7 @@ python-dotenv = "^1.0.0"
 aiomysql = "^0.2.0"
 # S3/R2 Storage
 boto3 = "^1.35.0"
+cryptography = "^46.0.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.0.0"
