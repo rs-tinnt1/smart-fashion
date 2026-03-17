@@ -20,6 +20,7 @@ build/
 *.egg
 .mypy_cache/
 .ruff_cache/
+.pytest_cache/
 
 # Virtual environments
 .venv/
@@ -34,14 +35,13 @@ ENV/
 *.swo
 *~
 
-# Documentation (except README)
+# Documentation
 docs/
 *.md
 !README.md
 
-# Tests (not needed in production image)
+# Tests
 tests/
-.pytest_cache/
 .coverage
 htmlcov/
 pytest.ini
@@ -50,15 +50,15 @@ pytest.ini
 .gitlab-ci.yml
 .travis.yml
 Jenkinsfile
-.github/
 
 # Docker files (avoid recursion)
 Dockerfile*
 docker-compose*.yml
 compose*.yml
 .dockerignore
+.docker/
 
-# Environment files (mounted at runtime)
+# Environment files
 .env
 .env.*
 !.env.example
@@ -79,12 +79,13 @@ models/
 inputs/
 outputs/
 uploads/
-
-# Temporary files
 tmp/
 temp/
+
+# Temporary files
 *.tmp
 *.bak
+*.swp
 
 # OS specific
 .DS_Store
@@ -93,5 +94,9 @@ desktop.ini
 
 # Development files
 Makefile
+verify_*.py
+CLAUDE.md
+AGENTS.md
+
+# Shell scripts (unless needed for entrypoint)
 *.sh
-!docker-entrypoint.sh

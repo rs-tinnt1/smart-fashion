@@ -5,7 +5,9 @@
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: smartfashion-dev
     image: smartfashion:${APP_VERSION:-latest}
     restart: unless-stopped
@@ -18,22 +20,17 @@ services:
       - UVICORN_HOST=0.0.0.0
       - UVICORN_PORT=${UVICORN_PORT:-8000}
       - UVICORN_WORKERS=1
-      - MINIO_MODEL_KEY=${MINIO_MODEL_KEY:-deepfashion2_yolov8s-seg.onnx}
+      - MODEL_SEGMENT=${MODEL_SEGMENT:-yolo26n-seg.pt}
+      - MODEL_SEGMENT_FALLBACK=${MODEL_SEGMENT_FALLBACK:-yolo11n-seg.pt}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
       # Database
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_USER=${DB_USER:-smartfashion}
-      - DB_PASSWORD=${DB_PASSWORD:-smartfashion}
-      - DB_NAME=${DB_NAME:-smartfashion}
-      # MinIO
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MINIO_BUCKET=${MINIO_BUCKET}
-      - MINIO_REGION=${MINIO_REGION}
-      - MINIO_SECURE=${MINIO_SECURE:-false}
-      - MINIO_EXTERNAL_ENDPOINT=${MINIO_EXTERNAL_ENDPOINT:-http://localhost:9000}
+      - DB_URL=mysql://${DB_USER:-smartfashion}:${DB_PASSWORD:-smartfashion}@mariadb:3306/${DB_NAME:-smartfashion}
+      # S3-compatible object storage
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - S3_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - S3_BUCKET=${MINIO_BUCKET:-smartfashion}
+      - S3_REGION=${MINIO_REGION:-us-east-1}
     depends_on:
       mariadb:
         condition: service_healthy

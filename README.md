@@ -1,6 +1,6 @@
 # Smart Fashion - Clothing Segmentation API
 
-FastAPI application for clothing segmentation using YOLOv8 with ONNX Runtime.
+FastAPI application for clothing segmentation using Ultralytics YOLO segmentation models.
 
 ## Quick Start
 
@@ -52,8 +52,8 @@ make docker-down
 Or using docker-compose directly:
 
 ```bash
-docker-compose up -d
-docker-compose logs -f app
+docker compose -f compose.yml up -d
+docker compose -f compose.yml logs -f app
 ```
 
 ### Podman Development
@@ -72,8 +72,8 @@ make podman-down
 Or using podman-compose directly:
 
 ```bash
-podman-compose up -d
-podman-compose logs -f app
+podman-compose -f compose.yml up -d
+podman-compose -f compose.yml logs -f app
 ```
 
 ### Production Deployment
@@ -89,7 +89,7 @@ make prod-down
 Or manually:
 
 ```bash
-podman build -t smartfashion:latest .
+podman build -t smartfashion:latest -f Dockerfile .
 podman-compose -f compose.prod.yml up -d
 ```
 
@@ -140,8 +140,9 @@ podman-compose -f compose.prod.yml up -d
 | --- | --- | --- |
 | `UVICORN_WORKERS` | 1 | Number of workers |
 | `UVICORN_PORT` | 8000 | Server port |
-| `OMP_NUM_THREADS` | 4 | CPU threads for ONNX |
-| `MINIO_MODEL_KEY` | deepfashion2_yolov8s-seg.onnx | Model file in MinIO |
+| `OMP_NUM_THREADS` | 4 | CPU threads for model inference |
+| `MODEL_SEGMENT` | `yolo26n-seg.pt` | Primary segmentation model key in object storage |
+| `MODEL_SEGMENT_FALLBACK` | `yolo11n-seg.pt` | Fallback model key if the primary model fails |
 
 ## Project Structure
 
@@ -159,7 +160,7 @@ podman-compose -f compose.prod.yml up -d
 │   │   └── health_schema.py            # Health check models
 │   ├── services/                       # Business logic & infrastructure
 │   │   ├── segmentation_service.py     # Core segmentation logic
-│   │   ├── inference_service.py        # ONNX Runtime wrapper
+│   │   ├── inference_service.py        # Ultralytics YOLO wrapper
 │   │   ├── database_service.py         # MariaDB operations
 │   │   ├── storage_service.py          # MinIO/S3 operations
 │   │   └── web_service.py              # Web utilities
@@ -198,15 +199,15 @@ podman-compose -f compose.prod.yml up -d
 # Import from specific modules
 from app.services.segmentation_service import segment_one_file
 from app.services.database_service import get_database, DatabaseService
-from app.services.storage_service import get_minio_service
-from app.services.inference_service import ONNXYOLOSegmentation
+from app.services.storage_service import get_storage_service
+from app.services.inference_service import YOLOSegmentation
 
 from app.models.detection_schema import BBox, DetectionSummary, PolygonData
 from app.models.image_schema import ImageResponse
 from app.models.job_schema import JobStatus
 
 # Or use package-level imports (via __init__.py)
-from app.services import get_database, segment_one_file, ONNXYOLOSegmentation
+from app.services import get_database, segment_one_file, YOLOSegmentation
 from app.models import DetectionSummary, ImageResponse, JobStatus
 from app.controllers import segment_router, gallery_router, upload_router
 ```

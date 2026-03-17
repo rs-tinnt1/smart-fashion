@@ -114,38 +114,38 @@ fix:
 # =============================================================================
 
 docker-up:
-	docker-compose up -d
+	docker compose -f compose.yml up -d
 
 docker-down:
-	docker-compose down
+	docker compose -f compose.yml down
 
 docker-logs:
-	docker-compose logs -f app
+	docker compose -f compose.yml logs -f app
 
 docker-build:
-	docker-compose up -d --build app
+	docker compose -f compose.yml up -d --build app
 
 docker-services:
-	docker-compose up -d mariadb minio
+	docker compose -f compose.yml up -d mariadb minio
 
 # =============================================================================
 # Podman
 # =============================================================================
 
 podman-up:
-	podman-compose up -d
+	podman-compose -f compose.yml up -d
 
 podman-down:
-	podman-compose down
+	podman-compose -f compose.yml down
 
 podman-logs:
-	podman-compose logs -f app
+	podman-compose -f compose.yml logs -f app
 
 podman-build:
 	podman build -t smartfashion:latest .
 
 podman-services:
-	podman-compose up -d mariadb minio
+	podman-compose -f compose.yml up -d mariadb minio
 
 # =============================================================================
 # Production
@@ -163,17 +163,17 @@ prod-down:
 # =============================================================================
 
 db-shell:
-	docker-compose exec mariadb mysql -u smartfashion -psmartfashion smartfashion
+	docker compose -f compose.yml exec mariadb mysql -u smartfashion -psmartfashion smartfashion
 
 db-reset:
-	docker-compose down -v
-	docker-compose up -d
+	docker compose -f compose.yml down -v
+	docker compose -f compose.yml up -d
 
 minio-ls:
-	docker-compose exec minio mc ls minio/smartfashion/
+	docker compose -f compose.yml exec minio mc ls minio/smartfashion/
 
 minio-policy:
-	docker-compose exec minio mc policy set download minio/smartfashion
+	docker compose -f compose.yml exec minio mc policy set download minio/smartfashion
 
 # =============================================================================
 # Cleanup
