@@ -31,7 +31,7 @@ def event_loop():
 def test_image_path():
     """Return path to a test image file."""
     # Look for test images in inputs directory
-    inputs_dir = Path(__file__).parent.parent / "inputs"
+    inputs_dir = Path(__file__).parent / "inputs"
     if inputs_dir.exists():
         images = list(inputs_dir.glob("*.png")) + list(inputs_dir.glob("*.jpg"))
         if images:

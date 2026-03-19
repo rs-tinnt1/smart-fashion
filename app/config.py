@@ -35,7 +35,7 @@ def _get_int_env(*names: str, default: int) -> int:
 
 
 # Model paths
-MODEL_SEGMENT = _get_env("MODEL_SEGMENT", default="yolo26n-seg.pt")
+MODEL_SEGMENT = _get_env("MODEL_SEGMENT", default="yolov8n-clothing-detection.pt")
 MODEL_SEGMENT_FALLBACK = _get_env("MODEL_SEGMENT_FALLBACK", default="yolo11n-seg.pt")
 MODEL_SEGMENT_CANDIDATES = list(dict.fromkeys([MODEL_SEGMENT, MODEL_SEGMENT_FALLBACK]))
 MODEL_PRELOAD = _get_bool_env("MODEL_PRELOAD", default=True)
@@ -45,8 +45,6 @@ UVICORN_HOST = _get_env("UVICORN_HOST", default="0.0.0.0")
 UVICORN_PORT = _get_int_env("PORT", "UVICORN_PORT", default=8000)
 UVICORN_WORKERS = _get_int_env("UVICORN_WORKERS", default=1)
 
-UPLOAD_DIR = Path("uploads")
-OUTPUT_DIR = Path("outputs")
 STATIC_DIR = Path("static")
 
 # DB settings (MariaDB/MySQL) - parse from connection string

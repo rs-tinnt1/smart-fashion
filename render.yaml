@@ -1,0 +1,34 @@
+# Minimal web-only blueprint for synchronous segmentation.
+# Use `render.worker.yaml` if you also want the background upload worker.
+services:
+  - type: web
+    runtime: docker
+    name: smart-fashion
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: UVICORN_WORKERS
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: MODEL_PRELOAD
+        value: "false"
+      - key: MODEL_SEGMENT
+        value: yolo26n-seg.pt
+      - key: MODEL_SEGMENT_FALLBACK
+        value: yolo11n-seg.pt
+      - key: DB_URL
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false

@@ -1,0 +1,57 @@
+# Web + worker blueprint for synchronous requests and queued uploads.
+envVarGroups:
+  - name: smart-fashion-shared
+    envVars:
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: MODEL_SEGMENT
+        value: yolo26n-seg.pt
+      - key: MODEL_SEGMENT_FALLBACK
+        value: yolo11n-seg.pt
+
+services:
+  - type: web
+    runtime: docker
+    name: smart-fashion
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - fromGroup: smart-fashion-shared
+      - key: PORT
+        value: "10000"
+      - key: UVICORN_WORKERS
+        value: "1"
+      - key: MODEL_PRELOAD
+        value: "false"
+      - key: DB_URL
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+
+  - type: worker
+    runtime: docker
+    name: smart-fashion-worker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerCommand: python worker.py
+    envVars:
+      - fromGroup: smart-fashion-shared
+      - key: DB_URL
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false

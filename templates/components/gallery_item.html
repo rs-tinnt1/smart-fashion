@@ -27,7 +27,7 @@
       <a
         href="{{ image.image_url }}"
         download
-        class="text-dusty-blue hover:text-charcoal transition-colors text-sm font-medium"
+        class="text-dusty-blue hover:text-charcoal transition-colors text-sm font-medium hidden"
         title="Download"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +36,7 @@
       </a>
       <button
         data-delete-image="{{ image.file_id }}"
-        class="text-fog hover:text-red-500 transition-colors text-sm font-medium"
+        class="text-fog hover:text-red-500 transition-colors text-sm font-medium ml-auto"
         title="Delete"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

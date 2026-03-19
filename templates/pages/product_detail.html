@@ -20,9 +20,9 @@
 
 /* Canvas container */
 .canvas-container {
-  background: #FFFFFF;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.5);
   overflow: hidden;
 }
 
@@ -31,7 +31,7 @@ input[type="radio"] {
   appearance: none;
   width: 18px;
   height: 18px;
-  border: 2px solid #E8E8E8;
+  border: 2px solid var(--border);
   border-radius: 50%;
   outline: none;
   cursor: pointer;
@@ -40,7 +40,7 @@ input[type="radio"] {
 }
 
 input[type="radio"]:checked {
-  border-color: #6B8E9E;
+  border-color: var(--primary);
 }
 
 input[type="radio"]:checked::before {
@@ -51,12 +51,12 @@ input[type="radio"]:checked::before {
   transform: translate(-50%, -50%);
   width: 8px;
   height: 8px;
-  background: #6B8E9E;
+  background: var(--primary);
   border-radius: 50%;
 }
 
 input[type="radio"]:hover {
-  border-color: #6B8E9E;
+  border-color: var(--primary);
 }
 {% endblock %}
 
@@ -171,7 +171,7 @@ input[type="radio"]:hover {
           </div>
 
           <!-- Download Button -->
-          <div class="pt-6 border-t border-light">
+          <div class="pt-6 border-t border-light hidden">
             <button
               id="downloadBtn"
               class="btn btn-primary w-full justify-center"

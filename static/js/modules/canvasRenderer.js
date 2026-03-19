@@ -21,6 +21,7 @@ export class CanvasRenderer {
   loadImage(imageUrl) {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         this.canvas.width = img.width;
         this.canvas.height = img.height;

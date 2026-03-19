@@ -8,6 +8,10 @@ Run: python worker.py [--once]
 import asyncio
 import json
 import sys
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 import traceback
 from pathlib import Path
 
@@ -73,15 +77,16 @@ class Worker:
             raise RuntimeError("Worker not initialized")
 
         try:
-            # Download image from storage
-            temp_path = Path(f"/tmp/worker_{image_id}.jpg")
-            if not self.storage.download_file(storage_url, temp_path):
+            # Download image bytes from storage
+            image_bytes = self.storage.download_bytes(storage_url)
+            if image_bytes is None:
                 raise RuntimeError(f"Failed to download image: {storage_url}")
 
             # Load image
-            image = cv2.imread(str(temp_path))
+            arr = np.frombuffer(image_bytes, np.uint8)
+            image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             if image is None:
-                raise ValueError(f"Could not load image: {temp_path}")
+                raise ValueError("Could not decode image")
 
             img_height, img_width = image.shape[:2]
 
@@ -135,9 +140,6 @@ class Worker:
                     )
 
                     print(f"  Created detection: {class_name} ({confidence:.2f})")
-
-            # Cleanup temp file
-            temp_path.unlink(missing_ok=True)
 
             # Mark job as done
             await self.db.mark_job_done(job_id)

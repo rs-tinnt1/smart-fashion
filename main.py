@@ -1,3 +1,9 @@
+import sys
+import asyncio
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import APP_VERSION, MODEL_PRELOAD, OUTPUT_DIR, STATIC_DIR, UPLOAD_DIR, UVICORN_HOST, UVICORN_PORT
+from app.config import APP_VERSION, MODEL_PRELOAD, STATIC_DIR, UVICORN_HOST, UVICORN_PORT
 from app.controllers.gallery_controller import router as gallery_router
 from app.controllers.segment_controller import router as api_router
 from app.controllers.upload_controller import router as upload_router
@@ -84,13 +90,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
 STATIC_DIR.mkdir(exist_ok=True)
 
 if Path("static").exists():
     app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/outputs", StaticFiles(directory="outputs"), name="outputs")
 
 templates = Jinja2Templates(directory="templates")
 templates.env.globals.update(APP_VERSION=APP_VERSION)

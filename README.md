@@ -1,8 +1,18 @@
-# Smart Fashion - Clothing Segmentation API
+# Smart Fashion - Clothing Segmentation & Detection API
 
-FastAPI application for clothing segmentation using Ultralytics YOLO segmentation models.
+FastAPI backend application for clothing item detection and polygon segmentation using Ultralytics YOLO models coupled with OpenCV GrabCut algorithms for zero-disk-I/O processing.
 
-## Quick Start
+---
+
+## 🌟 Key Features & Architecture
+
+* **Zero Disk I/O Pipeline**: Images are processed entirely in-memory using `BytesIO` and Numpy buffers. Files are never written to local disk, maximizing throughput and reducing wear.
+* **Hybrid Segmentation (YOLO + GrabCut)**: Uses YOLO `detect-only` models (e.g., `yolov8n-clothing-detection`) to tightly bound clothing items, then dynamically applies OpenCV's **GrabCut** algorithm to extract highly accurate, form-fitting polygons for the frontend canvas.
+* **Cloudflare R2 Storage**: Integrated with S3-compatible object storage using dynamically generated **Presigned URLs** to securely serve files without exposing the bucket to public access (resolving 403 Forbidden errors).
+* **Cascading MySQL Database**: Utilizes `aiomysql` to connect to cloud databases (like Aiven). Fully implements `ON DELETE CASCADE` to instantly wipe orphaned data across `images`, `detections`, and `polygons` when an item is deleted.
+* **Windows-Ready AsyncIO**: Built-in support for `asyncio.WindowsSelectorEventLoopPolicy` to prevent SSL tunnel crashes when connecting to secure cloud databases from local Windows development environments.
+
+## 🚀 Quick Start
 
 ### Using Makefile (Recommended)
 
@@ -10,7 +20,7 @@ FastAPI application for clothing segmentation using Ultralytics YOLO segmentatio
 # Show all available commands
 make help
 
-# Install dependencies
+# Install dependencies (Poetry)
 make install
 
 # Run development server
@@ -24,221 +34,74 @@ make test
 
 ```bash
 # Install dependencies
-make install
-# or: poetry install
+poetry install
 
 # Run development server
-make dev
-# or: poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
-
-# Run tests
-make test
-# or: poetry run pytest
-```
-
-### Docker Development
-
-```bash
-# Start all services
-make docker-up
-
-# View logs
-make docker-logs
-
-# Stop services
-make docker-down
-```
-
-Or using docker-compose directly:
-
-```bash
-docker compose -f compose.yml up -d
-docker compose -f compose.yml logs -f app
-```
-
-### Podman Development
-
-```bash
-# Start all services
-make podman-up
-
-# View logs
-make podman-logs
-
-# Stop services
-make podman-down
-```
-
-Or using podman-compose directly:
-
-```bash
-podman-compose -f compose.yml up -d
-podman-compose -f compose.yml logs -f app
+poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
 ```
 
 ### Production Deployment
 
-```bash
-# Build and deploy
-make prod-up
+Use the included `compose.prod.yml` or `render.yaml` for Docker-based web service deployments. Configure `MODEL_PRELOAD=false` on heavily constrained environments so the app can pass health checks before downloading the YOLO weights.
 
-# Stop production
-make prod-down
-```
-
-Or manually:
-
-```bash
-podman build -t smartfashion:latest -f Dockerfile .
-podman-compose -f compose.prod.yml up -d
-```
-
-## Makefile Commands
-
-| Command | Description |
-| --- | --- |
-| `make help` | Show all available commands |
-| `make install` | Install dependencies with Poetry |
-| `make dev` | Start development server |
-| `make test` | Run all tests |
-| `make test-cov` | Run tests with coverage |
-| `make test-level1` | Run infrastructure tests |
-| `make test-level2` | Run service tests |
-| `make test-level3` | Run API tests |
-| `make test-level4` | Run UI tests |
-| `make format` | Format code with ruff |
-| `make lint` | Lint code with ruff |
-| `make fix` | Fix linting issues |
-| `make docker-up` | Start all services (Docker) |
-| `make docker-down` | Stop services (Docker) |
-| `make docker-logs` | Follow app logs (Docker) |
-| `make docker-build` | Rebuild app container |
-| `make podman-up` | Start all services (Podman) |
-| `make podman-down` | Stop services (Podman) |
-| `make podman-logs` | Follow app logs (Podman) |
-| `make podman-build` | Build image with Podman |
-| `make prod-up` | Deploy production |
-| `make prod-down` | Stop production |
-| `make db-shell` | Open MariaDB shell |
-| `make db-reset` | Reset database (removes all data) |
-| `make minio-ls` | List files in MinIO bucket |
-| `make minio-policy` | Set bucket policy to public |
-| `make clean` | Remove cache and temp files |
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-| --- | --- | --- |
-| `/` | GET | Web UI |
-| `/api/segment` | POST | Upload images for segmentation |
-| `/api/health` | GET | Health check |
-| `/gallery` | GET | Image gallery |
-
-## Configuration
+## 🛠️ Configuration (.env)
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `UVICORN_WORKERS` | 1 | Number of workers |
-| `UVICORN_PORT` | 8000 | Server port |
-| `OMP_NUM_THREADS` | 4 | CPU threads for model inference |
-| `MODEL_SEGMENT` | `yolo26n-seg.pt` | Primary segmentation model key in object storage |
-| `MODEL_SEGMENT_FALLBACK` | `yolo11n-seg.pt` | Fallback model key if the primary model fails |
+| `UVICORN_WORKERS` | 1 | Number of ASGI workers |
+| `OMP_NUM_THREADS` | 4 | CPU threads allocated strictly for model inference |
+| `MODEL_SEGMENT` | `yolov8n-clothing-detection.pt` | Primary detection/segmentation model key in object storage |
+| `MODEL_SEGMENT_FALLBACK` | `yolo11n-seg.pt` | Fallback model key if the primary model fails to load |
+| `DB_URL` | | Connection string for MariaDB/MySQL (e.g., Aiven) |
+| `S3_ENDPOINT` | | Cloudflare R2 endpoint |
+| `S3_BUCKET` | | Bucket Name |
+| `S3_ACCESS_KEY_ID` / `SECRET` | | S3 Credentials |
 
-## Project Structure
+## 📂 Project Structure
 
-```
+```text
 ├── app/
 │   ├── controllers/                    # API routes (FastAPI routers)
-│   │   ├── segment_controller.py       # Segmentation API endpoints
+│   │   ├── segment_controller.py       # Segmentation API & Cascade Deletion
 │   │   ├── gallery_controller.py       # Gallery & product detail views
 │   │   └── upload_controller.py        # Upload & job status endpoints
 │   ├── models/                         # Pydantic schemas (request/response)
-│   │   ├── detection_schema.py         # BBox, Polygon, Detection models
-│   │   ├── image_schema.py             # Image metadata models
-│   │   ├── upload_schema.py            # Upload response models
-│   │   ├── job_schema.py               # Job status models
-│   │   └── health_schema.py            # Health check models
 │   ├── services/                       # Business logic & infrastructure
-│   │   ├── segmentation_service.py     # Core segmentation logic
-│   │   ├── inference_service.py        # Ultralytics YOLO wrapper
-│   │   ├── database_service.py         # MariaDB operations
-│   │   ├── storage_service.py          # MinIO/S3 operations
+│   │   ├── segmentation_service.py     # Core OpenCV Grabcut + Polygon logic
+│   │   ├── inference_service.py        # Ultralytics YOLO inference wrapper
+│   │   ├── database_service.py         # aiomysql operations
+│   │   ├── storage_service.py          # Boto3 S3/R2 operations & Presigned URLs
 │   │   └── web_service.py              # Web utilities
 │   └── config.py                       # Configuration settings
 ├── templates/                          # Jinja2 HTML templates
 ├── static/                             # Static assets (CSS, JS, images)
-├── tests/                              # 4-level integration tests
-├── db/                                 # Database schema (SQL)
-├── docs/                               # Documentation
-├── worker.py                           # Background job processor
+├── db/                                 # SQL schemas with ON DELETE CASCADE
+├── docs/                               # Legacy documentation & plans
 ├── main.py                             # FastAPI application entry point
 ├── Dockerfile                          # Production container image
-├── compose.yml                         # Development environment
-├── compose.prod.yml                    # Production environment
-├── Makefile                            # Simplified commands
-├── pyproject.toml                      # Poetry dependencies
-└── poetry.lock                         # Locked dependency versions
+└── pyproject.toml                      # Poetry dependencies
 ```
 
 ### Architecture Principles
 
-**Flat Architecture**: Files use descriptive names with suffixes instead of deep nesting
+**Flat Architecture**: Files use descriptive names with suffixes instead of deep nesting.
 - ✅ `services/database_service.py` - Clear, flat structure
 - ❌ `services/database/service.py` - Unnecessary nesting
 
-**Naming Conventions**:
-- Controllers: `*_controller.py` (e.g., `segment_controller.py`)
-- Services: `*_service.py` (e.g., `database_service.py`)
-- Models: `*_schema.py` (e.g., `detection_schema.py`)
+**Dependency Flow**: `Controllers` ➔ `Services` ➔ `Models` (Strict unidirectional flow to prevent circular imports).
 
-**Dependency Flow**: Controllers → Services → Models (no circular dependencies)
-
-### Import Examples
-
-```python
-# Import from specific modules
-from app.services.segmentation_service import segment_one_file
-from app.services.database_service import get_database, DatabaseService
-from app.services.storage_service import get_storage_service
-from app.services.inference_service import YOLOSegmentation
-
-from app.models.detection_schema import BBox, DetectionSummary, PolygonData
-from app.models.image_schema import ImageResponse
-from app.models.job_schema import JobStatus
-
-# Or use package-level imports (via __init__.py)
-from app.services import get_database, segment_one_file, YOLOSegmentation
-from app.models import DetectionSummary, ImageResponse, JobStatus
-from app.controllers import segment_router, gallery_router, upload_router
-```
-
-## Development
-
-### Running Tests
-
-```bash
-# Run all tests
-make test
-
-# Run with coverage
-make test-cov
-
-# Run specific test level
-make test-level1
-make test-level2
-make test-level3
-make test-level4
-```
-
-### Code Quality
+## 🧪 Development & Testing
 
 ```bash
 # Format code
 make format
 
-# Lint code
+# Lint code 
 make lint
 
 # Fix linting issues
 make fix
+
+# Reset local database (removes all data)
+make db-reset
 ```

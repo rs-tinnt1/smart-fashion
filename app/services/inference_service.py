@@ -34,6 +34,20 @@ class YOLOSegmentation:
             raise FileNotFoundError(f"Model not found: {model_path}")
 
         print(f"Loading YOLO model from: {model_path}")
+        
+        # Hot-patch ultralytics to support custom Segment26 head for the fashion model
+        try:
+            import ultralytics.nn.modules.head as head_module
+            import ultralytics.nn.modules.block as block_module
+            
+            if not hasattr(head_module, 'Segment26') and hasattr(head_module, 'Segment'):
+                head_module.Segment26 = head_module.Segment
+                
+            if not hasattr(block_module, 'Proto26') and hasattr(block_module, 'Proto'):
+                block_module.Proto26 = block_module.Proto
+        except ImportError:
+            pass
+            
         self.model = YOLO(str(model_path))
         print("Model loaded successfully")
         print(f"  Loaded model: {self.model_name}")

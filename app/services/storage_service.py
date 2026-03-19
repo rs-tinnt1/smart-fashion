@@ -134,6 +134,20 @@ class StorageService:
             print(f"Error downloading file: {e}")
             return False
 
+    def download_bytes(
+        self,
+        object_name: str,
+        bucket_name: Optional[str] = None,
+    ) -> Optional[bytes]:
+        """Download an object from S3/R2 directly into memory."""
+        bucket = bucket_name or self.default_bucket
+        try:
+            response = self.client.get_object(Bucket=bucket, Key=object_name)
+            return response['Body'].read()
+        except ClientError as e:
+            print(f"Error downloading bytes: {e}")
+            return None
+
     def get_presigned_url(
         self,
         object_name: str,
@@ -169,8 +183,13 @@ class StorageService:
             request_host: Optional host from request header (not used for R2)
         """
         bucket = bucket_name or self.default_bucket
-        # For R2, construct URL using the endpoint
-        # Note: For public access, you need to configure R2 public bucket or custom domain
+        # For R2 without a public custom domain, we must use presigned URLs
+        # to ensure the browser can load the image without 403 Forbidden
+        presigned_url = self.get_presigned_url(object_name, bucket)
+        if presigned_url:
+            return presigned_url
+        
+        # Fallback to direct URL
         return f"{S3_ENDPOINT}/{bucket}/{object_name}"
 
     def object_exists(

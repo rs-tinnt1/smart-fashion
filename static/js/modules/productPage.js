@@ -77,18 +77,28 @@ function setupDisplayModeControls(productCanvas) {
 function setupDownloadButton(downloadBtn, productCanvas, fileId, originalUrl) {
   if (!downloadBtn) return;
 
-  downloadBtn.addEventListener("click", () => {
+  downloadBtn.addEventListener("click", async () => {
     const displayMode = productCanvas.displayMode;
 
     if (displayMode !== "image") {
       // Download canvas with overlay
       productCanvas.download(`product-${fileId}-${displayMode}.png`);
     } else {
-      // Download original image
-      const link = document.createElement("a");
-      link.download = `product-${fileId}-original.jpg`;
-      link.href = originalUrl;
-      link.click();
+      // Download original image via fetch to bypass cross-origin download restrictions
+      try {
+        const response = await fetch(originalUrl);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.download = `product-${fileId}-original.jpg`;
+        link.href = objectUrl;
+        link.click();
+        
+        URL.revokeObjectURL(objectUrl);
+      } catch (err) {
+        console.error("Failed to download original image:", err);
+      }
     }
   });
 }

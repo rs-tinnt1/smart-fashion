@@ -97,11 +97,16 @@ async def segment_clothing(
                     status_code=400,
                     detail=f"File {file.filename} size ({file_size // 1024}KB) exceeds maximum allowed ({max_file_size_kb}KB)",
                 )
-            # Reset file position for segment_one_file
-            await file.seek(0)
-
-            # Process image with YOLO model
-            result = segment_one_file(file, yolo_model, storage, base_url, request_host=request.headers.get("host"))
+            # Process image with YOLO model using memory buffer
+            result = segment_one_file(
+                image_bytes=content,
+                filename=file.filename,
+                content_type=file.content_type,
+                model=yolo_model,
+                storage_service=storage,
+                base_url=base_url,
+                request_host=request.headers.get("host")
+            )
 
             # Save to database
             image_id = result["file_id"]
@@ -169,9 +174,16 @@ async def segment_clothing(
     return {"success": True, "processed_images": len(results), "results": results}
 
 
-@router.delete("/api/outputs/{file_id}")
-async def delete_output_endpoint(file_id: str, storage: StorageDependency):
-    deleted = delete_output(file_id, storage)
+@router.delete("/api/delete/{file_id}")
+async def delete_output_endpoint(file_id: str, storage: StorageDependency, db: DatabaseDependency):
+    image = await db.fetch_one("SELECT storage_url FROM images WHERE id = %s", (file_id,))
+    
+    deleted = delete_output(file_id, storage, image_storage_url=image['storage_url'] if image else None)
+    
+    if image:
+        await db.execute("DELETE FROM images WHERE id = %s", (file_id,))
+        deleted.append("db_record")
+        
     if not deleted:
         raise HTTPException(status_code=404, detail="Files not found")
     return {"success": True, "deleted": deleted}
