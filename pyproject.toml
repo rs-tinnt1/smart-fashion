@@ -19,15 +19,12 @@ ultralytics = "^8.3.0"
 # CV Libraries
 opencv-python-headless = "^4.10.0"
 numpy = "^2.0.0"
-pillow = "^11.0.0"
 # Utils
-aiofiles = "^24.1.0"
 python-dotenv = "^1.0.0"
 # Database
 aiomysql = "^0.2.0"
 # S3/R2 Storage
 boto3 = "^1.35.0"
-cryptography = "^46.0.3"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7.0.0"

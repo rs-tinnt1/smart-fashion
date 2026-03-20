@@ -19,9 +19,7 @@ services:
       - key: MODEL_PRELOAD
         value: "false"
       - key: MODEL_SEGMENT
-        value: yolo26n-seg.pt
-      - key: MODEL_SEGMENT_FALLBACK
-        value: yolo11n-seg.pt
+        value: yolov8n-clothing-detection.pt
       - key: DB_URL
         sync: false
       - key: S3_ENDPOINT

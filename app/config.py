@@ -36,8 +36,6 @@ def _get_int_env(*names: str, default: int) -> int:
 
 # Model paths
 MODEL_SEGMENT = _get_env("MODEL_SEGMENT", default="yolov8n-clothing-detection.pt")
-MODEL_SEGMENT_FALLBACK = _get_env("MODEL_SEGMENT_FALLBACK", default="yolo11n-seg.pt")
-MODEL_SEGMENT_CANDIDATES = list(dict.fromkeys([MODEL_SEGMENT, MODEL_SEGMENT_FALLBACK]))
 MODEL_PRELOAD = _get_bool_env("MODEL_PRELOAD", default=True)
 LOCAL_MODEL_CACHE = Path(os.getenv("LOCAL_MODEL_CACHE", "/tmp/models"))
 
@@ -71,23 +69,8 @@ DB_SSL_CERT = _get_env("DB_SSL_CERT", default=_db_query.get("ssl-cert", _db_quer
 DB_SSL_KEY = _get_env("DB_SSL_KEY", default=_db_query.get("ssl-key", _db_query.get("ssl_key", "")))
 
 # S3/R2 config (Cloudflare R2 is S3-compatible)
-S3_ENDPOINT = _get_env("S3_ENDPOINT", "MINIO_ENDPOINT", default="https://account.r2.cloudflarestorage.com")
-S3_ACCESS_KEY_ID = _get_env("S3_ACCESS_KEY_ID", "MINIO_ROOT_USER", default="")
-S3_SECRET_ACCESS_KEY = _get_env("S3_SECRET_ACCESS_KEY", "MINIO_ROOT_PASSWORD", default="")
-S3_BUCKET = _get_env("S3_BUCKET", "MINIO_BUCKET", default="smartfashion")
-S3_REGION = _get_env("S3_REGION", "MINIO_REGION", default="auto")  # R2 uses 'auto' for region
-
-COLORS = [
-    (0, 255, 0),
-    (255, 0, 0),
-    (0, 0, 255),
-    (255, 255, 0),
-    (255, 0, 255),
-    (0, 255, 255),
-    (128, 0, 128),
-    (0, 128, 255),
-    (255, 128, 0),
-    (128, 255, 0),
-    (0, 128, 128),
-    (128, 128, 0),
-]
+S3_ENDPOINT = _get_env("S3_ENDPOINT", default="https://account.r2.cloudflarestorage.com")
+S3_ACCESS_KEY_ID = _get_env("S3_ACCESS_KEY_ID", default="")
+S3_SECRET_ACCESS_KEY = _get_env("S3_SECRET_ACCESS_KEY", default="")
+S3_BUCKET = _get_env("S3_BUCKET", default="smartfashion")
+S3_REGION = _get_env("S3_REGION", default="auto")

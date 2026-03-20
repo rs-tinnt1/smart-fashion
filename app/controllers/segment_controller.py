@@ -80,32 +80,33 @@ async def segment_clothing(
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
-    base_url = str(request.base_url).rstrip("/")
     results = []
 
     # File size limit
     max_file_size_kb = 500
     max_file_size_bytes = max_file_size_kb * 1024
+    filename = "upload.jpg"
 
     for file in files:
+        filename = file.filename if file.filename is not None else "upload.jpg"
         try:
             # Check file size before processing
+            content_type = file.content_type if file.content_type is not None else "application/octet-stream"
             content = await file.read()
             file_size = len(content)
             if file_size > max_file_size_bytes:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"File {file.filename} size ({file_size // 1024}KB) exceeds maximum allowed ({max_file_size_kb}KB)",
+                    detail=f"File {filename} size ({file_size // 1024}KB) exceeds maximum allowed ({max_file_size_kb}KB)",
                 )
             # Process image with YOLO model using memory buffer
             result = segment_one_file(
                 image_bytes=content,
-                filename=file.filename,
-                content_type=file.content_type,
+                filename=filename,
+                content_type=content_type,
                 model=yolo_model,
                 storage_service=storage,
-                base_url=base_url,
-                request_host=request.headers.get("host")
+                request_host=request.headers.get("host"),
             )
 
             # Save to database
@@ -169,7 +170,7 @@ async def segment_clothing(
             # Let HTTPException propagate (e.g., file size validation)
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error processing {file.filename}: {str(e)}") from e
+            raise HTTPException(status_code=500, detail=f"Error processing {filename}: {str(e)}") from e
 
     return {"success": True, "processed_images": len(results), "results": results}
 
@@ -177,13 +178,13 @@ async def segment_clothing(
 @router.delete("/api/delete/{file_id}")
 async def delete_output_endpoint(file_id: str, storage: StorageDependency, db: DatabaseDependency):
     image = await db.fetch_one("SELECT storage_url FROM images WHERE id = %s", (file_id,))
-    
-    deleted = delete_output(file_id, storage, image_storage_url=image['storage_url'] if image else None)
-    
+
+    deleted = delete_output(file_id, storage, image_storage_url=image["storage_url"] if image else None)
+
     if image:
         await db.execute("DELETE FROM images WHERE id = %s", (file_id,))
         deleted.append("db_record")
-        
+
     if not deleted:
         raise HTTPException(status_code=404, detail="Files not found")
     return {"success": True, "deleted": deleted}

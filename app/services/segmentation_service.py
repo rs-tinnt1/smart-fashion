@@ -1,17 +1,17 @@
-# app/services/segmentation_service.py
-from pathlib import Path
-import uuid
-import shutil
 import json
-from typing import List, Dict, Any, Optional
+import uuid
+from typing import Any
 
 import cv2
 import numpy as np
 
-from ..config import COLORS
+
+def _contour_to_points(contour: Any) -> list[dict[str, int]]:
+    points = np.asarray(contour).reshape(-1, 2)
+    return [{"x": int(x), "y": int(y)} for x, y in points.tolist()]
 
 
-def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str, Any]:
+def _process_one_image(image_bytes: bytes, model: Any) -> dict[str, Any]:
     """Process image to extract segmentation data WITHOUT drawing on the image.
     Returns polygon data for client-side rendering."""
     arr = np.frombuffer(image_bytes, np.uint8)
@@ -21,11 +21,7 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
 
     results = model(image, conf=0.25, iou=0.45, retina_masks=True)
 
-    export_data = {
-        "image_width": image.shape[1],
-        "image_height": image.shape[0],
-        "objects": []
-    }
+    export_data = {"image_width": image.shape[1], "image_height": image.shape[0], "objects": []}
 
     result = results[0]
     has_boxes = result.boxes is not None and len(result.boxes) > 0
@@ -45,7 +41,8 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
 
         for i, mask in enumerate(masks):
             bbox = boxes_xyxy[i]
-            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+            bbox_x1, bbox_y1, bbox_x2, bbox_y2 = (int(value) for value in bbox[:4])
+            x1, y1, x2, y2 = bbox_x1, bbox_y1, bbox_x2, bbox_y2
 
             # Expand bbox slightly (5% each side) to avoid cutting edges
             bbox_margin = 0.05
@@ -62,8 +59,8 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
             bbox_mask[y1:y2, x1:x2] = 1.0
             mask_resized = mask_resized * bbox_mask
 
-            MASK_THRESHOLD = 0.75
-            mask_binary = (mask_resized > MASK_THRESHOLD).astype(np.uint8) * 255
+            mask_threshold = 0.75
+            mask_binary = (mask_resized > mask_threshold).astype(np.uint8) * 255
 
             kernel_size = max(5, int(min(img_width, img_height) * 0.01))
             if kernel_size % 2 == 0:
@@ -88,62 +85,66 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
                 contours = [cnt for cnt in contours if cv2.contourArea(cnt) >= largest_area * 0.20]
                 contours = [cv2.approxPolyDP(cnt, 0.001 * cv2.arcLength(cnt, True), True) for cnt in contours]
 
-            contours_data = [[{"x": int(p[0][0]), "y": int(p[0][1])} for p in cnt] for cnt in contours]
+            contours_data = [_contour_to_points(contour) for contour in contours]
 
-            export_data["objects"].append({
-                "id": i,
-                "class_id": int(class_ids[i]),
-                "class_name": class_names[int(class_ids[i])],
-                "confidence": float(confidences[i]),
-                "bbox": {
-                    "x": int(bbox[0]), "y": int(bbox[1]),
-                    "w": int(bbox[2] - bbox[0]), "h": int(bbox[3] - bbox[1])
-                },
-                "contours": contours_data
-            })
+            export_data["objects"].append(
+                {
+                    "id": i,
+                    "class_id": int(class_ids[i]),
+                    "class_name": class_names[int(class_ids[i])],
+                    "confidence": float(confidences[i]),
+                    "bbox": {
+                        "x": bbox_x1,
+                        "y": bbox_y1,
+                        "w": bbox_x2 - bbox_x1,
+                        "h": bbox_y2 - bbox_y1,
+                    },
+                    "contours": contours_data,
+                }
+            )
 
     # ── Path B: Detection-only model (no masks) — use GrabCut to extract polygon ──
     else:
         for i in range(len(class_ids)):
             bbox = boxes_xyxy[i]
-            x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-            
+            bbox_x1, bbox_y1, bbox_x2, bbox_y2 = (int(value) for value in bbox[:4])
+            x1, y1, x2, y2 = bbox_x1, bbox_y1, bbox_x2, bbox_y2
+
             # Ensure boundaries
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(img_width, x2), min(img_height, y2)
-            
+
             w, h = x2 - x1, y2 - y1
-            
+
             contours_data = []
-            
+            rect: tuple[int, int, int, int] = (x1, y1, w, h)
+
             # Attempt to extract precise foreground mask using GrabCut
             if w > 10 and h > 10:
                 try:
                     gc_mask = np.zeros((img_height, img_width), np.uint8)
-                    bgdModel = np.zeros((1, 65), np.float64)
-                    fgdModel = np.zeros((1, 65), np.float64)
-                    
-                    rect = (x1, y1, w, h)
-                    
+                    bgd_model = np.zeros((1, 65), np.float64)
+                    fgd_model = np.zeros((1, 65), np.float64)
+
                     # Run GrabCut for 3 iterations
-                    cv2.grabCut(image, gc_mask, rect, bgdModel, fgdModel, 3, cv2.GC_INIT_WITH_RECT)
-                    
+                    cv2.grabCut(image, gc_mask, rect, bgd_model, fgd_model, 3, cv2.GC_INIT_WITH_RECT)
+
                     # 0, 2 are background; 1, 3 are foreground
-                    mask_binary = np.where((gc_mask == 1) | (gc_mask == 3), 255, 0).astype('uint8')
-                    
+                    mask_binary = np.where((gc_mask == 1) | (gc_mask == 3), 255, 0).astype("uint8")
+
                     # Cleanup mask with morphology
                     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
                     mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_OPEN, kernel, iterations=1)
                     mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_CLOSE, kernel, iterations=2)
-                    
+
                     contours, _ = cv2.findContours(mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    
+
                     if contours:
                         contours = sorted(contours, key=cv2.contourArea, reverse=True)
                         largest_area = cv2.contourArea(contours[0])
-                        
+
                         valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) >= largest_area * 0.15]
-                        
+
                         # Smooth polygons
                         smoothed = []
                         for cnt in valid_contours:
@@ -151,9 +152,9 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
                             approx = cv2.approxPolyDP(cnt, epsilon, True)
                             if len(approx) > 2:
                                 smoothed.append(approx)
-                        
+
                         if smoothed:
-                            contours_data = [[{"x": int(p[0][0]), "y": int(p[0][1])} for p in cnt] for cnt in smoothed]
+                            contours_data = [_contour_to_points(contour) for contour in smoothed]
                 except Exception as e:
                     print(f"GrabCut failed for bbox {rect}: {e}")
 
@@ -167,21 +168,23 @@ def _process_one_image(image_bytes: bytes, file_id: str, model: Any) -> Dict[str
                 ]
                 contours_data = [rect_polygon]
 
-            export_data["objects"].append({
-                "id": i,
-                "class_id": int(class_ids[i]),
-                "class_name": class_names[int(class_ids[i])],
-                "confidence": float(confidences[i]),
-                "bbox": {
-                    "x": int(bbox[0]), "y": int(bbox[1]),
-                    "w": int(bbox[2] - bbox[0]), "h": int(bbox[3] - bbox[1])
-                },
-                "contours": contours_data
-            })
+            export_data["objects"].append(
+                {
+                    "id": i,
+                    "class_id": int(class_ids[i]),
+                    "class_name": class_names[int(class_ids[i])],
+                    "confidence": float(confidences[i]),
+                    "bbox": {
+                        "x": bbox_x1,
+                        "y": bbox_y1,
+                        "w": bbox_x2 - bbox_x1,
+                        "h": bbox_y2 - bbox_y1,
+                    },
+                    "contours": contours_data,
+                }
+            )
 
-    return {
-        "json_data": export_data
-    }
+    return {"json_data": export_data}
 
 
 def segment_one_file(
@@ -190,81 +193,75 @@ def segment_one_file(
     content_type: str,
     model: Any,
     storage_service: Any,
-    base_url: str = "",
-    request_host: Optional[str] = None
-) -> Dict[str, Any]:
+    request_host: str | None = None,
+) -> dict[str, Any]:
     """Handle a single uploaded file – uploads ORIGINAL image & JSON to S3/R2 directly from memory.
-    
+
     Args:
         image_bytes: Raw image bytes
         filename: Original filename
         content_type: MIME type of the upload
         model: YOLO model for inference
         storage_service: S3/R2 storage service instance
-        base_url: Base URL of the application
         request_host: Request host header for dynamic URLs
     """
     if not content_type.startswith("image/"):
         raise ValueError(f"File {filename} is not an image")
 
     file_id = str(uuid.uuid4())
-    result = _process_one_image(image_bytes, file_id, model)
-    
+    result = _process_one_image(image_bytes, model)
+
     # Upload ORIGINAL image bytes to S3/R2 (not output image)
-    file_ext = filename.rsplit('.', 1)[-1] if '.' in filename else 'jpg'
+    file_ext = filename.rsplit(".", 1)[-1] if "." in filename else "jpg"
     original_image_key = f"images/{file_id}.{file_ext}"
     storage_service.upload_bytes(image_bytes, original_image_key, content_type=content_type)
-    
+
     # Upload JSON data bytes to S3/R2
-    json_bytes = json.dumps(result["json_data"]).encode('utf-8')
+    json_bytes = json.dumps(result["json_data"]).encode("utf-8")
     json_key = f"outputs/{file_id}_data.json"
     storage_service.upload_bytes(json_bytes, json_key, content_type="application/json")
-    
+
     # Get public URLs
     original_image_url = storage_service.get_public_url(original_image_key, request_host=request_host)
     json_url = storage_service.get_public_url(json_key, request_host=request_host)
-    
+
     return {
         "filename": filename,
         "file_id": file_id,
         "segmentation_data": result["json_data"],
         "original_image_url": original_image_url,
         "original_image_key": original_image_key,  # For database storage_url
-        "json_url": json_url
+        "json_url": json_url,
     }
 
 
-def delete_output(file_id: str, storage_service: Any, image_storage_url: str = None) -> List[str]:
+def delete_output(file_id: str, storage_service: Any, image_storage_url: str | None = None) -> list[str]:
     """Delete output files and original image for a given file_id from S3/R2."""
     output_json_key = f"outputs/{file_id}_data.json"
     deleted = []
-    
+
     # Delete original image using DB URL or fallback extensions
     if image_storage_url:
-        if storage_service.object_exists(image_storage_url):
-            storage_service.delete_object(image_storage_url)
+        storage_key = image_storage_url
+        if storage_service.object_exists(storage_key):
+            storage_service.delete_object(storage_key)
             deleted.append("original_image")
     else:
-        for ext in ['jpg', 'png', 'jpeg', 'webp']:
+        for ext in ["jpg", "png", "jpeg", "webp"]:
             fallback_img_key = f"images/{file_id}.{ext}"
             if storage_service.object_exists(fallback_img_key):
                 storage_service.delete_object(fallback_img_key)
                 deleted.append(f"original_image_{ext}")
                 break
-                
+
     # Delete metadata JSON object
     if storage_service.object_exists(output_json_key):
         storage_service.delete_object(output_json_key)
         deleted.append("json")
-        
+
     return deleted
 
 
-def get_stats() -> Dict[str, Any]:
+def get_stats() -> dict[str, Any]:
     """Collect statistics about processed images. Note: Local stats disabled in Zero Disk I/O mode."""
-    return {
-        "total_images": 0,
-        "total_objects": 0,
-        "class_distribution": {},
-        "average_objects_per_image": 0
-    }
+    return {"total_images": 0, "total_objects": 0, "class_distribution": {}, "average_objects_per_image": 0}

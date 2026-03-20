@@ -37,18 +37,3 @@ export async function deleteImage(fileId) {
 
   return response.json();
 }
-
-/**
- * Get image details by ID
- * @param {string} fileId - Image file ID
- * @returns {Promise<Object>} Image details with detections
- */
-export async function getImageDetails(fileId) {
-  const response = await fetch(`/api/details/${fileId}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch details");
-  }
-
-  return response.json();
-}

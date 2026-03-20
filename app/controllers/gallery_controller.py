@@ -4,12 +4,14 @@ Gallery Controller with MariaDB Integration
 Provides gallery page and API endpoints for viewing processed images.
 """
 
-from fastapi import APIRouter, Request, Depends, HTTPException
+import json
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import json
 
-from app.services.database_service import get_database, DatabaseService
+from app.services.database_service import DatabaseService, get_database
 from app.services.storage_service import get_storage_service
 
 router = APIRouter()
@@ -26,13 +28,17 @@ def get_storage():
     return get_storage_service()
 
 
+DatabaseDependency = Annotated[DatabaseService, Depends(get_db)]
+StorageDependency = Annotated[Any, Depends(get_storage)]
+
+
 @router.get("/gallery", response_class=HTMLResponse)
 async def gallery(
     request: Request,
+    db: DatabaseDependency,
+    storage: StorageDependency,
     page: int = 1,
-    tag: str = None,
-    db: DatabaseService = Depends(get_db),
-    storage=Depends(get_storage)
+    tag: str | None = None,
 ):
     """
     Render gallery page with images from database.
@@ -40,7 +46,7 @@ async def gallery(
     """
     per_page = 10
     offset = (page - 1) * per_page
-    
+
     # Build query based on tag filter
     if tag:
         # Filter by tag
@@ -56,8 +62,8 @@ async def gallery(
             FROM images i
             LEFT JOIN detections d ON d.image_id = i.id
             WHERE i.id IN (
-                SELECT DISTINCT image_id 
-                FROM detections 
+                SELECT DISTINCT image_id
+                FROM detections
                 WHERE label = %s
             )
             GROUP BY i.id
@@ -65,7 +71,7 @@ async def gallery(
             LIMIT %s OFFSET %s
         """
         count_result = await db.fetch_one(count_query, (tag,))
-        total_count = count_result['total'] if count_result else 0
+        total_count = count_result["total"] if count_result else 0
         images_data = await db.fetch_all(images_query, (tag, per_page, offset))
     else:
         # No filter - all images
@@ -80,49 +86,51 @@ async def gallery(
             LIMIT %s OFFSET %s
         """
         count_result = await db.fetch_one(count_query)
-        total_count = count_result['total'] if count_result else 0
+        total_count = count_result["total"] if count_result else 0
         images_data = await db.fetch_all(images_query, (per_page, offset))
-    
+
     # Calculate pagination info
     total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
-    
+
     images = []
     for img in images_data:
         # Get detection labels for this image
-        detections = await db.fetch_all(
-            "SELECT DISTINCT label FROM detections WHERE image_id = %s",
-            (img['id'],)
-        )
-        class_names = [d['label'] for d in detections]
-        
+        detections = await db.fetch_all("SELECT DISTINCT label FROM detections WHERE image_id = %s", (img["id"],))
+        class_names = [d["label"] for d in detections]
+
         # Use original image URL (not output)
-        original_url = storage.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
-        
-        images.append({
-            "file_id": img['id'],
-            "image_url": original_url or f"/static/placeholder.jpg",
-            "object_count": img['detection_count'] or 0,
-            "classes": class_names,
-            "timestamp": img['uploaded_at'].strftime("%Y-%m-%d %H:%M:%S") if img['uploaded_at'] else ""
-        })
-    
-    return templates.TemplateResponse("pages/gallery.html", {
-        "request": request,
-        "images": images,
-        "current_page": page,
-        "total_pages": total_pages,
-        "total_count": total_count,
-        "current_tag": tag,
-        "per_page": per_page
-    })
+        original_url = storage.get_public_url(img["storage_url"], request_host=request.headers.get("host"))
+
+        images.append(
+            {
+                "file_id": img["id"],
+                "image_url": original_url or "/static/placeholder.jpg",
+                "object_count": img["detection_count"] or 0,
+                "classes": class_names,
+                "timestamp": img["uploaded_at"].strftime("%Y-%m-%d %H:%M:%S") if img["uploaded_at"] else "",
+            }
+        )
+
+    return templates.TemplateResponse(
+        "pages/gallery.html",
+        {
+            "request": request,
+            "images": images,
+            "current_page": page,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "current_tag": tag,
+            "per_page": per_page,
+        },
+    )
 
 
 @router.get("/product/{image_id}", response_class=HTMLResponse)
 async def product_detail(
     request: Request,
     image_id: str,
-    db: DatabaseService = Depends(get_db),
-    storage=Depends(get_storage)
+    db: DatabaseDependency,
+    storage: StorageDependency,
 ):
     """
     Render product detail page for a specific image.
@@ -132,7 +140,7 @@ async def product_detail(
     image = await db.get_image(image_id)
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
-    
+
     # Get all detections with polygons for this image
     detections_raw = await db.fetch_all(
         """SELECT d.id, d.label, d.confidence, d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
@@ -140,60 +148,54 @@ async def product_detail(
            FROM detections d
            LEFT JOIN polygons p ON p.detection_id = d.id
            WHERE d.image_id = %s""",
-        (image_id,)
+        (image_id,),
     )
-    
+
     # Get unique class names
-    class_names = list(set([d['label'] for d in detections_raw]))
+    class_names = list({d["label"] for d in detections_raw})
     object_count = len(detections_raw)
-    
+
     # Format detections data for frontend
     detections_data = []
     for d in detections_raw:
         detection = {
-            "id": d['id'],
-            "label": d['label'],
-            "confidence": d['confidence'],
-            "bbox": {
-                "x": d['bbox_x'],
-                "y": d['bbox_y'],
-                "w": d['bbox_w'],
-                "h": d['bbox_h']
-            }
+            "id": d["id"],
+            "label": d["label"],
+            "confidence": d["confidence"],
+            "bbox": {"x": d["bbox_x"], "y": d["bbox_y"], "w": d["bbox_w"], "h": d["bbox_h"]},
         }
-        
-        # Add polygon data if available
-        if d['points_json']:
-            detection['polygon'] = {
-                "points_json": d['points_json'],
-                "simplified": d['simplified']
-            }
-        
-        detections_data.append(detection)
-    
-    # Get original image URL (not output)
-    original_url = storage.get_public_url(image['storage_url'], request_host=request.headers.get('host'))
-    
-    return templates.TemplateResponse("pages/product_detail.html", {
-        "request": request,
-        "file_id": image_id,
-        "original_url": original_url,
-        "image_width": image['width'],
-        "image_height": image['height'],
-        "object_count": object_count,
-        "classes": class_names,
-        "detections_json": json.dumps(detections_data),  # JSON string for JavaScript
-        "timestamp": image['uploaded_at'].strftime("%Y-%m-%d %H:%M:%S") if image['uploaded_at'] else ""
-    })
 
+        # Add polygon data if available
+        if d["points_json"]:
+            detection["polygon"] = {"points_json": d["points_json"], "simplified": d["simplified"]}
+
+        detections_data.append(detection)
+
+    # Get original image URL (not output)
+    original_url = storage.get_public_url(image["storage_url"], request_host=request.headers.get("host"))
+
+    return templates.TemplateResponse(
+        "pages/product_detail.html",
+        {
+            "request": request,
+            "file_id": image_id,
+            "original_url": original_url,
+            "image_width": image["width"],
+            "image_height": image["height"],
+            "object_count": object_count,
+            "classes": class_names,
+            "detections_json": json.dumps(detections_data),  # JSON string for JavaScript
+            "timestamp": image["uploaded_at"].strftime("%Y-%m-%d %H:%M:%S") if image["uploaded_at"] else "",
+        },
+    )
 
 
 @router.get("/api/gallery")
 async def api_gallery(
     request: Request,
-    db: DatabaseService = Depends(get_db),
-    storage=Depends(get_storage),
-    limit: int = 50
+    db: DatabaseDependency,
+    storage: StorageDependency,
+    limit: int = 50,
 ):
     """
     API endpoint to get gallery data as JSON.
@@ -207,66 +209,53 @@ async def api_gallery(
            GROUP BY i.id
            ORDER BY i.uploaded_at DESC
            LIMIT %s""",
-        (limit,)
+        (limit,),
     )
-    
+
     result = []
     for img in images_data:
         # Get detections for this image
         detections = await db.fetch_all(
-            """SELECT id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h 
+            """SELECT id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h
                FROM detections WHERE image_id = %s""",
-            (img['id'],)
+            (img["id"],),
         )
-        
+
         # Get public URLs
-        original_url = storage.get_public_url(img['storage_url'], request_host=request.headers.get('host'))
-        output_key = f"outputs/{img['id']}_output.jpg"
-        output_url = None
-        if storage.object_exists(output_key):
-            output_url = storage.get_public_url(output_key, request_host=request.headers.get('host'))
-        
-        result.append({
-            "id": img['id'],
-            "original_url": original_url,
-            "output_url": output_url,
-            "width": img['width'],
-            "height": img['height'],
-            "file_size": img['file_size'],
-            "uploaded_at": img['uploaded_at'].isoformat() if img['uploaded_at'] else None,
-            "detection_count": img['detection_count'] or 0,
-            "detections": [
-                {
-                    "id": d['id'],
-                    "label": d['label'],
-                    "confidence": d['confidence'],
-                    "bbox": {
-                        "x": d['bbox_x'],
-                        "y": d['bbox_y'],
-                        "w": d['bbox_w'],
-                        "h": d['bbox_h']
+        original_url = storage.get_public_url(img["storage_url"], request_host=request.headers.get("host"))
+        result.append(
+            {
+                "id": img["id"],
+                "original_url": original_url,
+                "width": img["width"],
+                "height": img["height"],
+                "file_size": img["file_size"],
+                "uploaded_at": img["uploaded_at"].isoformat() if img["uploaded_at"] else None,
+                "detection_count": img["detection_count"] or 0,
+                "detections": [
+                    {
+                        "id": d["id"],
+                        "label": d["label"],
+                        "confidence": d["confidence"],
+                        "bbox": {"x": d["bbox_x"], "y": d["bbox_y"], "w": d["bbox_w"], "h": d["bbox_h"]},
                     }
-                }
-                for d in detections
-            ]
-        })
-    
+                    for d in detections
+                ],
+            }
+        )
+
     return {"images": result, "count": len(result)}
 
 
 @router.get("/api/gallery/{image_id}")
-async def api_gallery_image(
-    image_id: str,
-    db: DatabaseService = Depends(get_db),
-    storage=Depends(get_storage)
-):
+async def api_gallery_image(image_id: str, db: DatabaseDependency, storage: StorageDependency):
     """
     Get detailed info for a specific image including all detections with polygons.
     """
     image = await db.get_image(image_id)
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
-    
+
     # Get all detections with polygons
     detections = await db.fetch_all(
         """SELECT d.id, d.label, d.confidence, d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h,
@@ -274,34 +263,25 @@ async def api_gallery_image(
            FROM detections d
            LEFT JOIN polygons p ON p.detection_id = d.id
            WHERE d.image_id = %s""",
-        (image_id,)
+        (image_id,),
     )
-    
+
     # Get URLs
-    original_url = storage.get_presigned_url(image['storage_url'])
-    output_key = f"outputs/{image_id}_output.jpg"
-    output_url = storage.get_presigned_url(output_key) if storage.object_exists(output_key) else None
-    
+    original_url = storage.get_presigned_url(image["storage_url"])
     return {
-        "id": image['id'],
+        "id": image["id"],
         "original_url": original_url,
-        "output_url": output_url,
-        "width": image['width'],
-        "height": image['height'],
-        "uploaded_at": image['uploaded_at'].isoformat() if image['uploaded_at'] else None,
+        "width": image["width"],
+        "height": image["height"],
+        "uploaded_at": image["uploaded_at"].isoformat() if image["uploaded_at"] else None,
         "detections": [
             {
-                "id": d['id'],
-                "label": d['label'],
-                "confidence": d['confidence'],
-                "bbox": {
-                    "x": d['bbox_x'],
-                    "y": d['bbox_y'],
-                    "w": d['bbox_w'],
-                    "h": d['bbox_h']
-                },
-                "polygon": d['points_json'] if d['points_json'] else None
+                "id": d["id"],
+                "label": d["label"],
+                "confidence": d["confidence"],
+                "bbox": {"x": d["bbox_x"], "y": d["bbox_y"], "w": d["bbox_w"], "h": d["bbox_h"]},
+                "polygon": d["points_json"] if d["points_json"] else None,
             }
             for d in detections
-        ]
+        ],
     }

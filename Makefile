@@ -3,8 +3,7 @@
 
 .PHONY: help install dev run test test-cov test-level1 test-level2 test-level3 test-level4 \
         format lint fix docker-up docker-down docker-logs docker-build \
-        podman-up podman-down podman-logs podman-build prod-up prod-down \
-        db-shell db-reset minio-ls minio-policy clean
+        podman-up podman-down podman-logs podman-build clean
 
 # Default target
 help:
@@ -41,16 +40,6 @@ help:
 	@echo "  make podman-down    Stop podman-compose services"
 	@echo "  make podman-logs    Follow app logs"
 	@echo "  make podman-build   Build image with podman"
-	@echo ""
-	@echo "Production:"
-	@echo "  make prod-up        Deploy production (podman)"
-	@echo "  make prod-down      Stop production services"
-	@echo ""
-	@echo "Database & Storage:"
-	@echo "  make db-shell       Open MariaDB shell"
-	@echo "  make db-reset       Reset database (removes all data)"
-	@echo "  make minio-ls       List files in MinIO bucket"
-	@echo "  make minio-policy   Set bucket policy to public"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          Remove cache and temp files"
@@ -125,9 +114,6 @@ docker-logs:
 docker-build:
 	docker compose -f compose.yml up -d --build app
 
-docker-services:
-	docker compose -f compose.yml up -d mariadb minio
-
 # =============================================================================
 # Podman
 # =============================================================================
@@ -143,37 +129,6 @@ podman-logs:
 
 podman-build:
 	podman build -t smartfashion:latest .
-
-podman-services:
-	podman-compose -f compose.yml up -d mariadb minio
-
-# =============================================================================
-# Production
-# =============================================================================
-
-prod-up:
-	podman build -t smartfashion:latest .
-	podman-compose -f compose.prod.yml up -d
-
-prod-down:
-	podman-compose -f compose.prod.yml down
-
-# =============================================================================
-# Database & Storage
-# =============================================================================
-
-db-shell:
-	docker compose -f compose.yml exec mariadb mysql -u smartfashion -psmartfashion smartfashion
-
-db-reset:
-	docker compose -f compose.yml down -v
-	docker compose -f compose.yml up -d
-
-minio-ls:
-	docker compose -f compose.yml exec minio mc ls minio/smartfashion/
-
-minio-policy:
-	docker compose -f compose.yml exec minio mc policy set download minio/smartfashion
 
 # =============================================================================
 # Cleanup

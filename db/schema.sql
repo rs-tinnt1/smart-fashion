@@ -2,7 +2,6 @@
 -- MariaDB 11.x compatible
 
 -- Drop tables if exist (for clean re-creation)
-DROP TABLE IF EXISTS product_tags;
 DROP TABLE IF EXISTS embeddings;
 DROP TABLE IF EXISTS polygons;
 DROP TABLE IF EXISTS detections;
@@ -66,14 +65,4 @@ CREATE TABLE embeddings (
     model_name VARCHAR(100) NOT NULL,
     `vector` JSON NOT NULL,
     FOREIGN KEY (detection_id) REFERENCES detections(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Product tags table (1:N with detections)
-CREATE TABLE product_tags (
-    id CHAR(36) PRIMARY KEY,
-    detection_id CHAR(36) NOT NULL,
-    tag_name VARCHAR(100) NOT NULL,
-    FOREIGN KEY (detection_id) REFERENCES detections(id) ON DELETE CASCADE,
-    INDEX idx_product_tags_detection_id (detection_id),
-    INDEX idx_product_tags_tag_name (tag_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

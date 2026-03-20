@@ -6,6 +6,7 @@
 {% block page_identifier %}product{% endblock %}
 
 {% block extra_styles %}
+<style>
 /* Staggered tag animations */
 .tag-delay-0 { animation-delay: 0ms; }
 .tag-delay-1 { animation-delay: 50ms; }
@@ -58,6 +59,7 @@ input[type="radio"]:checked::before {
 input[type="radio"]:hover {
   border-color: var(--primary);
 }
+</style>
 {% endblock %}
 
 {% block navigation %}
@@ -91,6 +93,7 @@ input[type="radio"]:hover {
               src="{{ original_url }}"
               alt="Original Product"
               class="hidden"
+              crossorigin="anonymous"
             />
           </div>
 

@@ -7,9 +7,7 @@ envVarGroups:
       - key: MALLOC_ARENA_MAX
         value: "2"
       - key: MODEL_SEGMENT
-        value: yolo26n-seg.pt
-      - key: MODEL_SEGMENT_FALLBACK
-        value: yolo11n-seg.pt
+        value: yolov8n-clothing-detection.pt
 
 services:
   - type: web

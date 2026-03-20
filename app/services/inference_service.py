@@ -10,14 +10,14 @@ from typing import Any
 
 from ultralytics.models.yolo.model import YOLO
 
-from app.config import LOCAL_MODEL_CACHE, MODEL_SEGMENT_CANDIDATES, S3_BUCKET
+from app.config import LOCAL_MODEL_CACHE, MODEL_SEGMENT, S3_BUCKET
 
 
 class YOLOSegmentation:
     """
     YOLO Segmentation inference class using ultralytics library.
 
-    Supports .pt (PyTorch) model format for YOLOv8/YOLO11/YOLO26 segmentation models.
+    Supports .pt (PyTorch) model format for YOLOv8 segmentation models.
     """
 
     def __init__(self, model_path: str, model_name: str | None = None):
@@ -34,20 +34,20 @@ class YOLOSegmentation:
             raise FileNotFoundError(f"Model not found: {model_path}")
 
         print(f"Loading YOLO model from: {model_path}")
-        
+
         # Hot-patch ultralytics to support custom Segment26 head for the fashion model
         try:
-            import ultralytics.nn.modules.head as head_module
             import ultralytics.nn.modules.block as block_module
-            
-            if not hasattr(head_module, 'Segment26') and hasattr(head_module, 'Segment'):
-                head_module.Segment26 = head_module.Segment
-                
-            if not hasattr(block_module, 'Proto26') and hasattr(block_module, 'Proto'):
-                block_module.Proto26 = block_module.Proto
+            import ultralytics.nn.modules.head as head_module
+
+            if not hasattr(head_module, "Segment26") and hasattr(head_module, "Segment"):
+                head_module.__dict__["Segment26"] = head_module.Segment
+
+            if not hasattr(block_module, "Proto26") and hasattr(block_module, "Proto"):
+                block_module.__dict__["Proto26"] = block_module.Proto
         except ImportError:
             pass
-            
+
         self.model = YOLO(str(model_path))
         print("Model loaded successfully")
         print(f"  Loaded model: {self.model_name}")
@@ -110,22 +110,11 @@ def _load_cached_or_downloaded_model(storage_service: Any, model_name: str) -> Y
 
 
 def load_best_segment_model(storage_service: Any) -> tuple[YOLOSegmentation, str]:
-    """Load the first available segmentation model from the configured candidates."""
+    """Load the configured segmentation model from object storage."""
     LOCAL_MODEL_CACHE.mkdir(parents=True, exist_ok=True)
-    errors: list[str] = []
-
-    for model_name in MODEL_SEGMENT_CANDIDATES:
-        try:
-            model = _load_cached_or_downloaded_model(storage_service, model_name)
-            print(f"Active segmentation model: {model_name}")
-            return model, model_name
-        except Exception as exc:
-            error_message = f"{model_name}: {type(exc).__name__}: {exc}"
-            print(f"Failed to initialize model {model_name}: {exc}")
-            errors.append(error_message)
-
-    error_details = "; ".join(errors) if errors else "No model candidates configured"
-    raise RuntimeError(f"Failed to initialize any segmentation model. {error_details}")
+    model = _load_cached_or_downloaded_model(storage_service, MODEL_SEGMENT)
+    print(f"Active segmentation model: {MODEL_SEGMENT}")
+    return model, MODEL_SEGMENT
 
 
 def load_model(model_path: str, model_name: str | None = None) -> YOLOSegmentation:

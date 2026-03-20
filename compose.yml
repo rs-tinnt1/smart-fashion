@@ -1,6 +1,6 @@
 # ===========================================
-# Docker Compose - Development Configuration
-# Usage: podman-compose up -d
+# Docker Compose - App + Worker Configuration
+# Uses external R2 and MySQL via environment variables.
 # ===========================================
 
 services:
@@ -20,22 +20,14 @@ services:
       - UVICORN_HOST=0.0.0.0
       - UVICORN_PORT=${UVICORN_PORT:-8000}
       - UVICORN_WORKERS=1
-      - MODEL_SEGMENT=${MODEL_SEGMENT:-yolo26n-seg.pt}
-      - MODEL_SEGMENT_FALLBACK=${MODEL_SEGMENT_FALLBACK:-yolo11n-seg.pt}
+      - MODEL_SEGMENT=${MODEL_SEGMENT:-yolov8n-clothing-detection.pt}
       - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
-      # Database
-      - DB_URL=mysql://${DB_USER:-smartfashion}:${DB_PASSWORD:-smartfashion}@mariadb:3306/${DB_NAME:-smartfashion}
-      # S3-compatible object storage
-      - S3_ENDPOINT=http://minio:9000
-      - S3_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - S3_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - S3_BUCKET=${MINIO_BUCKET:-smartfashion}
-      - S3_REGION=${MINIO_REGION:-us-east-1}
-    depends_on:
-      mariadb:
-        condition: service_healthy
-      minio:
-        condition: service_started
+      - DB_URL=${DB_URL}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET:-smartfashion}
+      - S3_REGION=${S3_REGION:-auto}
     networks:
       - smartfashion-network
     healthcheck:
@@ -51,50 +43,28 @@ services:
       retries: 3
       start_period: 30s
 
-  mariadb:
-    image: mariadb:11
-    container_name: mariadb
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: smartfashion-worker
+    image: smartfashion-worker:${APP_VERSION:-latest}
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - MARIADB_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-rootpassword}
-      - MARIADB_DATABASE=${DB_NAME:-smartfashion}
-      - MARIADB_USER=${DB_USER:-smartfashion}
-      - MARIADB_PASSWORD=${DB_PASSWORD:-smartfashion}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
-    networks:
-      - smartfashion-network
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  minio:
-    image: minio/minio:latest
-    container_name: minio
-    restart: unless-stopped
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MINIO_SERVER_URL=http://localhost:9000
-      - MINIO_BROWSER_REDIRECT_URL=http://localhost:9001
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+      - PYTHONUNBUFFERED=1
+      - MODEL_SEGMENT=${MODEL_SEGMENT:-yolov8n-clothing-detection.pt}
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-4}
+      - DB_URL=${DB_URL}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY}
+      - S3_BUCKET=${S3_BUCKET:-smartfashion}
+      - S3_REGION=${S3_REGION:-auto}
+    command: python worker.py
     networks:
       - smartfashion-network
 
 networks:
   smartfashion-network:
-
-volumes:
-  mariadb_data:
-  minio_data:

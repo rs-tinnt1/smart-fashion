@@ -5,10 +5,11 @@ Tests for FastAPI endpoints.
 These tests verify that API endpoints work correctly with services.
 """
 
-import pytest
-import httpx
 import uuid
 from pathlib import Path
+
+import httpx
+import pytest
 
 
 class TestHealthEndpoint:
@@ -25,7 +26,7 @@ class TestHealthEndpoint:
         """Verify health endpoint response format."""
         response = httpx.get(f"{base_url}/api/health", timeout=10.0)
         data = response.json()
-        
+
         assert "status" in data
         assert data["status"] == "healthy"
         assert "model_loaded" in data
@@ -48,15 +49,11 @@ class TestSegmentEndpoint:
         """INT-API-002: Test segment endpoint with single image."""
         if test_image_path is None:
             pytest.skip("No test image available")
-        
+
         with open(test_image_path, "rb") as f:
             files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(
-                f"{base_url}/api/segment",
-                files=files,
-                timeout=60.0
-            )
-        
+            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -69,18 +66,14 @@ class TestSegmentEndpoint:
         """INT-API-002: Test that segment returns a valid file_id."""
         if test_image_path is None:
             pytest.skip("No test image available")
-        
+
         with open(test_image_path, "rb") as f:
             files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(
-                f"{base_url}/api/segment",
-                files=files,
-                timeout=60.0
-            )
-        
+            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+
         data = response.json()
         result = data["results"][0]
-        
+
         assert "file_id" in result
         # Verify UUID format
         try:
@@ -94,46 +87,39 @@ class TestSegmentEndpoint:
         """INT-API-003: Test that segment saves data to database."""
         if test_image_path is None:
             pytest.skip("No test image available")
-        
+
         with open(test_image_path, "rb") as f:
             files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(
-                f"{base_url}/api/segment",
-                files=files,
-                timeout=60.0
-            )
-        
+            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+
         data = response.json()
         file_id = data["results"][0]["file_id"]
-        
+
         # Verify image exists in gallery
         gallery_response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
         gallery_data = gallery_response.json()
-        
+
         image_ids = [img["id"] for img in gallery_data["images"]]
         assert file_id in image_ids, f"Image {file_id} should be in gallery"
 
     @pytest.mark.level3
     @pytest.mark.slow
     def test_segment_presigned_url_format(self, base_url, test_image_path):
-        """INT-API-004: Test that segment returns correct presigned URL format."""
+        """INT-API-004: Test that segment returns a usable original image URL."""
         if test_image_path is None:
             pytest.skip("No test image available")
-        
+
         with open(test_image_path, "rb") as f:
             files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(
-                f"{base_url}/api/segment",
-                files=files,
-                timeout=60.0
-            )
-        
+            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+
         data = response.json()
         result = data["results"][0]
-        output_url = result.get("output_image_url", "")
-        
-        assert "localhost:9000" in output_url, f"URL should use localhost:9000, got: {output_url}"
-        assert "minio:9000" not in output_url, f"URL should NOT use minio:9000, got: {output_url}"
+        original_url = result.get("original_image_url", "")
+
+        assert original_url, "Segment response should include original_image_url"
+        assert original_url.startswith("http"), f"URL should be absolute, got: {original_url}"
+        assert "minio:9000" not in original_url, f"URL should NOT use minio:9000, got: {original_url}"
 
     @pytest.mark.level3
     @pytest.mark.slow
@@ -141,20 +127,16 @@ class TestSegmentEndpoint:
         """INT-API-004: Test that presigned URL is accessible."""
         if test_image_path is None:
             pytest.skip("No test image available")
-        
+
         with open(test_image_path, "rb") as f:
             files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(
-                f"{base_url}/api/segment",
-                files=files,
-                timeout=60.0
-            )
-        
+            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+
         data = response.json()
-        output_url = data["results"][0].get("output_image_url")
-        
-        if output_url:
-            url_response = httpx.get(output_url, timeout=10.0)
+        original_url = data["results"][0].get("original_image_url")
+
+        if original_url:
+            url_response = httpx.get(original_url, timeout=10.0)
             assert url_response.status_code == 200, f"URL should be accessible, got: {url_response.status_code}"
 
 
@@ -172,7 +154,7 @@ class TestGalleryEndpoint:
         """Verify gallery endpoint response format."""
         response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
         data = response.json()
-        
+
         assert "images" in data
         assert "count" in data
         assert isinstance(data["images"], list)
@@ -183,7 +165,7 @@ class TestGalleryEndpoint:
         """Verify gallery images have required fields."""
         response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
         data = response.json()
-        
+
         if len(data["images"]) > 0:
             image = data["images"][0]
             assert "id" in image
@@ -191,16 +173,15 @@ class TestGalleryEndpoint:
             assert "detection_count" in image
 
     @pytest.mark.level3
-    def test_gallery_urls_use_localhost(self, base_url):
-        """INT-API-005: Verify gallery URLs use localhost."""
+    def test_gallery_urls_do_not_use_minio(self, base_url):
+        """INT-API-005: Verify gallery URLs do not point to legacy MinIO hosts."""
         response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
         data = response.json()
-        
+
         for image in data["images"]:
             original_url = image.get("original_url", "")
             if original_url:
-                assert "localhost:9000" in original_url or original_url.startswith("/"), \
-                    f"URL should use localhost:9000, got: {original_url}"
+                assert original_url.startswith("http") or original_url.startswith("/")
                 assert "minio:9000" not in original_url
 
 
@@ -213,14 +194,10 @@ class TestFileSizeValidation:
         """Test that files > 500KB are rejected."""
         # Create a large fake file (600KB of zeros)
         large_content = b"\x00" * (600 * 1024)
-        
+
         files = {"files": ("large_file.jpg", large_content, "image/jpeg")}
-        response = httpx.post(
-            f"{base_url}/api/segment",
-            files=files,
-            timeout=30.0
-        )
-        
+        response = httpx.post(f"{base_url}/api/segment", files=files, timeout=30.0)
+
         assert response.status_code == 400, "Large files should be rejected with 400"
         data = response.json()
         assert "exceeds" in data.get("detail", "").lower() or "size" in data.get("detail", "").lower()
