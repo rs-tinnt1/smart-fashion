@@ -1,58 +1,11 @@
-// imageProcessor.js - Process images and display results
+// imageProcessor.js - Render segmentation results
 
-import { segmentImages } from "../utils/api.js";
-import { show, hide, clearElement } from "../utils/dom.js";
+import { show } from "../utils/dom.js";
 
-/**
- * Process images through segmentation API
- * @param {FileHandler} fileHandler - File handler instance
- * @param {HTMLElement} resultsContainer - Results container element
- * @param {HTMLElement} loadingElement - Loading indicator element
- * @param {HTMLElement} processBtn - Process button element
- * @param {HTMLElement} resultsSection - Results section element
- */
-export async function processImages(
-  fileHandler,
-  resultsContainer,
-  loadingElement,
-  processBtn,
-  resultsSection
-) {
-  if (!fileHandler.hasFiles()) return;
-
-  show(loadingElement);
-  processBtn.disabled = true;
-  clearElement(resultsContainer);
-  hide(resultsSection);
-
-  try {
-    const response = await segmentImages(fileHandler.getFiles());
-    displayResults(response.results, resultsContainer, resultsSection);
-  } catch (error) {
-    console.error("Error processing images:", error);
-    alert("Failed to process images. Please try again.");
-  } finally {
-    hide(loadingElement);
-    processBtn.disabled = false;
-  }
-}
-
-/**
- * Display segmentation results
- * @param {Array} results - Segmentation results
- * @param {HTMLElement} container - Container element
- * @param {HTMLElement} section - Section element
- */
-export function displayResults(results, container, section) {
-  clearElement(container);
-
-  results.forEach((result) => {
-    const resultCard = createResultCard(result);
-    container.appendChild(resultCard);
-  });
-
+export function prependResult(result, container, section) {
+  const resultCard = createResultCard(result);
+  container.prepend(resultCard);
   show(section);
-  section.scrollIntoView({ behavior: "smooth" });
 }
 
 /**
@@ -67,9 +20,14 @@ function createResultCard(result) {
   const objects = result.segmentation_data?.objects || [];
   const objectsDetected = objects.length;
   const classes = [...new Set(objects.map((obj) => obj.class_name))];
+  const previewUrl = result.preview_url || result.original_image_url || "";
+  const downloadUrl = result.original_image_url || result.preview_url || "";
+  const downloadButton = downloadUrl
+    ? `<a href="${downloadUrl}" download class="btn btn-primary flex-1 text-center text-sm">Download</a>`
+    : `<span class="btn btn-primary flex-1 text-center text-sm opacity-60 pointer-events-none">Stored Locally</span>`;
 
   card.innerHTML = `
-    <img src="${result.original_image_url}" alt="Segmented image" class="gallery-item__image">
+    <img src="${previewUrl}" alt="Segmented image" class="gallery-item__image">
     <div class="gallery-item__content">
       <div class="flex justify-between items-center mb-3">
         <span class="text-base font-medium text-charcoal">${objectsDetected} objects detected</span>
@@ -79,10 +37,7 @@ function createResultCard(result) {
         ${classes.map((cls) => `<span class="tag">${cls}</span>`).join("")}
       </div>
       <div class="flex gap-3 mt-5">
-        <a href="${result.original_image_url}" download
-           class="btn btn-primary flex-1 text-center text-sm">
-          Download
-        </a>
+        ${downloadButton}
       </div>
     </div>
   `;

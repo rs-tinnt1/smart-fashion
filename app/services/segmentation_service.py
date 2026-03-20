@@ -192,7 +192,7 @@ def segment_one_file(
     filename: str,
     content_type: str,
     model: Any,
-    storage_service: Any,
+    storage_service: Any | None,
     request_host: str | None = None,
 ) -> dict[str, Any]:
     """Handle a single uploaded file – uploads ORIGINAL image & JSON to S3/R2 directly from memory.
@@ -211,19 +211,23 @@ def segment_one_file(
     file_id = str(uuid.uuid4())
     result = _process_one_image(image_bytes, model)
 
-    # Upload ORIGINAL image bytes to S3/R2 (not output image)
     file_ext = filename.rsplit(".", 1)[-1] if "." in filename else "jpg"
-    original_image_key = f"images/{file_id}.{file_ext}"
-    storage_service.upload_bytes(image_bytes, original_image_key, content_type=content_type)
+    original_image_key = None
+    original_image_url = None
+    json_url = None
 
-    # Upload JSON data bytes to S3/R2
     json_bytes = json.dumps(result["json_data"]).encode("utf-8")
-    json_key = f"outputs/{file_id}_data.json"
-    storage_service.upload_bytes(json_bytes, json_key, content_type="application/json")
 
-    # Get public URLs
-    original_image_url = storage_service.get_public_url(original_image_key, request_host=request_host)
-    json_url = storage_service.get_public_url(json_key, request_host=request_host)
+    if storage_service is not None:
+        original_candidate_key = f"images/{file_id}.{file_ext}"
+        json_key = f"outputs/{file_id}_data.json"
+
+        if storage_service.upload_bytes(image_bytes, original_candidate_key, content_type=content_type):
+            original_image_key = original_candidate_key
+            original_image_url = storage_service.get_public_url(original_candidate_key, request_host=request_host)
+
+        if storage_service.upload_bytes(json_bytes, json_key, content_type="application/json"):
+            json_url = storage_service.get_public_url(json_key, request_host=request_host)
 
     return {
         "filename": filename,

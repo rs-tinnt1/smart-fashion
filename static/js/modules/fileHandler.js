@@ -18,13 +18,18 @@ export class FileHandler {
    */
   validateFiles(files) {
     const result = { valid: [], errors: [] };
+    const remainingSlots = Math.max(0, MAX_FILES - this.selectedFiles.length);
 
-    // Check max files
-    if (files.length > MAX_FILES) {
+    if (remainingSlots === 0) {
+      result.errors.push(`Queue is full. Maximum ${MAX_FILES} files allowed.`);
+      return result;
+    }
+
+    if (files.length > remainingSlots) {
       result.errors.push(
-        `Maximum ${MAX_FILES} files allowed. You selected ${files.length} files.`
+        `Only ${remainingSlots} queue slots left. Extra files were ignored.`
       );
-      files = files.slice(0, MAX_FILES);
+      files = files.slice(0, remainingSlots);
     }
 
     files.forEach((file) => {
@@ -50,7 +55,14 @@ export class FileHandler {
   addFiles(newFiles) {
     const validated = this.validateFiles(newFiles);
     if (validated.valid.length > 0) {
-      this.selectedFiles = validated.valid;
+      this.selectedFiles.push(
+        ...validated.valid.map((file) => ({
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          file,
+          status: "waiting",
+          error: "",
+        }))
+      );
     }
     return validated;
   }
@@ -59,8 +71,8 @@ export class FileHandler {
    * Remove file at index
    * @param {number} index - Index of file to remove
    */
-  removeFile(index) {
-    this.selectedFiles.splice(index, 1);
+  removeFile(id) {
+    this.selectedFiles = this.selectedFiles.filter((job) => job.id !== id);
   }
 
   /**
@@ -69,6 +81,39 @@ export class FileHandler {
    */
   getFiles() {
     return this.selectedFiles;
+  }
+
+  getNextWaitingFile() {
+    return this.selectedFiles.find((job) => job.status === "waiting") || null;
+  }
+
+  markProcessing(id) {
+    const job = this.selectedFiles.find((item) => item.id === id);
+    if (job) {
+      job.status = "processing";
+      job.error = "";
+    }
+  }
+
+  markFailed(id, error) {
+    const job = this.selectedFiles.find((item) => item.id === id);
+    if (job) {
+      job.status = "failed";
+      job.error = error;
+    }
+  }
+
+  retryFailed() {
+    this.selectedFiles.forEach((job) => {
+      if (job.status === "failed") {
+        job.status = "waiting";
+        job.error = "";
+      }
+    });
+  }
+
+  countByStatus(status) {
+    return this.selectedFiles.filter((job) => job.status === status).length;
   }
 
   /**

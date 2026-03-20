@@ -45,6 +45,17 @@ Use `render.yaml` for the web service or `render.worker.yaml` for web + worker d
 
 If you want to avoid long Docker builds on Render, use the image-backed blueprints in `render.image.yaml` and `render.image.worker.yaml`. The repository now includes `.github/workflows/build-image.yml`, which publishes a `linux/amd64` image to GHCR and can optionally trigger Render deploy hooks via the `RENDER_WEBHOOK_URL` and `RENDER_WORKER_WEBHOOK_URL` secrets.
 
+### Render Free Profile
+
+The home page is tuned for a single free Render web service:
+
+- uploads stay on the home page and run one image at a time
+- the queue is local to the browser with a hard limit of 100 images
+- `POST /api/segment` no longer requires the database to succeed
+- gallery and history features degrade gracefully when `DB_URL` is not configured
+
+This profile keeps the app usable on Render Free, but it is still best-effort: cold starts and the first lazy model load can still be slow.
+
 ## 🛠️ Configuration (.env)
 
 | Variable | Default | Description |

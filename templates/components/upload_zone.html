@@ -6,7 +6,7 @@
   <p class="drop-zone__title text-2xl font-medium mb-2">Drop your images here</p>
   <p class="drop-zone__subtitle text-base mb-1">or click to browse files</p>
   <p class="drop-zone__info text-sm mt-8">
-    Supports JPG, PNG, WebP • Max 100 files • 500KB per file
+    Supports JPG, PNG, WebP • Local queue max 100 files • 500KB per file
   </p>
 </div>
 
@@ -14,16 +14,17 @@
 
 <!-- File Preview: Clean list with left accent -->
 <div id="filePreview" class="hidden mt-10">
-  <h3 class="text-xl font-medium mb-6 text-charcoal">Selected Files</h3>
+  <h3 class="text-xl font-medium mb-3 text-charcoal">Queue</h3>
+  <p class="text-sm text-fog mb-6">Images run one by one so the app stays stable on Render Free.</p>
   <div id="fileList" class="space-y-3 mb-10"></div>
   <button id="processBtn" class="btn btn-primary btn-large">
-    Process Images
+    Queue Is Empty
   </button>
 </div>
 
 <!-- Loading State -->
 <div id="loading" class="hidden mt-16 text-center">
   <div class="loader mx-auto mb-6"></div>
-  <p class="text-lg text-charcoal">Processing images...</p>
-  <p class="text-sm text-fog mt-2">This typically takes a few moments</p>
+  <p class="text-lg text-charcoal">Queue is running...</p>
+  <p class="text-sm text-fog mt-2">Render Free processes one image at a time.</p>
 </div>

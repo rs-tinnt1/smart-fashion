@@ -20,7 +20,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 
-async def get_db(request: Request) -> DatabaseService:
+async def get_db(request: Request) -> DatabaseService | None:
     """Dependency to get database service."""
     try:
         db = await get_database()
@@ -29,7 +29,7 @@ async def get_db(request: Request) -> DatabaseService:
     except Exception as exc:
         set_runtime_component(request.app, "database", False, str(exc))
         add_runtime_warning(request.app, f"Database initialization failed: {exc}")
-        raise
+        return None
 
 
 def get_storage():
@@ -77,7 +77,7 @@ async def _fetch_detections_by_image(db: DatabaseService, image_ids: list[str]) 
     return dict(detections_by_image)
 
 
-DatabaseDependency = Annotated[DatabaseService, Depends(get_db)]
+DatabaseDependency = Annotated[DatabaseService | None, Depends(get_db)]
 StorageDependency = Annotated[Any, Depends(get_storage)]
 
 
@@ -95,6 +95,20 @@ async def gallery(
     """
     per_page = 10
     offset = (page - 1) * per_page
+
+    if db is None:
+        return templates.TemplateResponse(
+            "pages/gallery.html",
+            {
+                "request": request,
+                "images": [],
+                "current_page": page,
+                "total_pages": 0,
+                "total_count": 0,
+                "current_tag": tag,
+                "per_page": per_page,
+            },
+        )
 
     # Build query based on tag filter
     if tag:
@@ -186,6 +200,9 @@ async def product_detail(
     Render product detail page for a specific image.
     Returns original image and detection data with polygons for client-side rendering.
     """
+    if db is None:
+        raise HTTPException(status_code=503, detail="Gallery is unavailable on the free profile")
+
     # Fetch image data
     image = await db.get_image(image_id)
     if not image:
@@ -250,6 +267,9 @@ async def api_gallery(
     """
     API endpoint to get gallery data as JSON.
     """
+    if db is None:
+        return {"images": [], "count": 0, "available": False}
+
     # Fetch all images with detection counts
     images_data = await db.fetch_all(
         """SELECT i.id, i.storage_url, i.width, i.height, i.file_size, i.uploaded_at,
@@ -300,6 +320,9 @@ async def api_gallery_image(image_id: str, db: DatabaseDependency, storage: Stor
     """
     Get detailed info for a specific image including all detections with polygons.
     """
+    if db is None:
+        raise HTTPException(status_code=503, detail="Gallery is unavailable on the free profile")
+
     image = await db.get_image(image_id)
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")

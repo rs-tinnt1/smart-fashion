@@ -7,7 +7,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
 from app.config import MODEL_PRELOAD
-from app.services.database_service import DatabaseService, get_database
+from app.services.database_service import get_database
 from app.services.runtime_status import add_runtime_warning, get_runtime_snapshot, set_runtime_component
 from app.services.segmentation_service import delete_output, get_stats, segment_one_file
 
@@ -61,52 +61,9 @@ def get_storage():
     return storage_service
 
 
-async def get_db(request: Request) -> DatabaseService:
-    """Dependency to get database service."""
-    try:
-        db = await get_database()
-        set_runtime_component(request.app, "database", True, "connection pool initialized")
-        return db
-    except Exception as exc:
-        set_runtime_component(request.app, "database", False, str(exc))
-        add_runtime_warning(request.app, f"Database initialization failed: {exc}")
-        raise
-
-
-def _build_detection_record(obj: dict[str, Any]) -> dict[str, Any]:
-    bbox = obj.get("bbox") or {}
-    contours = obj.get("contours", [])
-
-    bbox_x = int(bbox.get("x", 0))
-    bbox_y = int(bbox.get("y", 0))
-    bbox_w = int(bbox.get("w", 0))
-    bbox_h = int(bbox.get("h", 0))
-
-    if (bbox_w <= 0 or bbox_h <= 0) and contours and contours[0]:
-        xs = [point["x"] for point in contours[0]]
-        ys = [point["y"] for point in contours[0]]
-        bbox_x = min(xs)
-        bbox_y = min(ys)
-        bbox_w = max(xs) - bbox_x
-        bbox_h = max(ys) - bbox_y
-
-    return {
-        "label": obj.get("class_name", "unknown"),
-        "confidence": float(obj.get("confidence", 0.0)),
-        "bbox_x": bbox_x,
-        "bbox_y": bbox_y,
-        "bbox_w": bbox_w,
-        "bbox_h": bbox_h,
-        "contours": contours,
-        "simplified": True,
-        "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
-    }
-
-
 UploadedFiles = Annotated[list[UploadFile], File(...)]
 LoadedModel = Annotated[Any, Depends(get_model)]
 StorageDependency = Annotated[Any, Depends(get_storage)]
-DatabaseDependency = Annotated[DatabaseService, Depends(get_db)]
 
 
 @router.get("/api/health")
@@ -157,7 +114,7 @@ async def readiness_check(request: Request):
         checks["database"] = {"ready": database_ready, "detail": database_detail}
         set_runtime_component(request.app, "database", database_ready, database_detail)
     except Exception as exc:
-        checks["database"] = {"ready": False, "detail": str(exc)}
+        checks["database"] = {"ready": False, "detail": f"optional for free profile: {exc}"}
         set_runtime_component(request.app, "database", False, str(exc))
 
     if model is not None:
@@ -171,7 +128,8 @@ async def readiness_check(request: Request):
         checks["model"] = {"ready": True, "detail": "lazy load enabled; first segmentation request will warm the model"}
         set_runtime_component(request.app, "model", False, "deferred until first segmentation request")
 
-    ready = all(bool(check["ready"]) for check in checks.values())
+    required_components = ["storage", "model"] if MODEL_PRELOAD else ["storage"]
+    ready = all(bool(checks[component]["ready"]) for component in required_components if component in checks)
     response = {
         "status": "ready" if ready else "not_ready",
         "checks": checks,
@@ -186,7 +144,6 @@ async def segment_clothing(
     files: UploadedFiles,
     yolo_model: LoadedModel,
     storage: StorageDependency,
-    db: DatabaseDependency,
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
@@ -210,32 +167,14 @@ async def segment_clothing(
                     detail=f"File {filename} size ({file_size // 1024}KB) exceeds maximum allowed ({max_file_size_kb}KB)",
                 )
             # Process image with YOLO model using memory buffer
-            result = segment_one_file(
-                image_bytes=content,
-                filename=filename,
-                content_type=content_type,
-                model=yolo_model,
-                storage_service=storage,
-                request_host=request.headers.get("host"),
-            )
-
-            # Save to database
-            image_id = result["file_id"]
-            segmentation_data = result.get("segmentation_data", {})
-            objects = segmentation_data.get("objects", [])
-            detection_records = [_build_detection_record(obj) for obj in objects]
-
-            # Create image record in database
-            # Use original image key (not output image)
-            storage_key = result.get("original_image_key", f"images/{image_id}.jpg")
-            await db.create_image_with_detections(
-                image_id=image_id,
-                storage_url=storage_key,
-                width=segmentation_data.get("image_width", 0),
-                height=segmentation_data.get("image_height", 0),
-                file_size=file_size,
-                hash=None,
-                detections=detection_records,
+            result = await run_in_threadpool(
+                segment_one_file,
+                content,
+                filename,
+                content_type,
+                yolo_model,
+                storage,
+                request.headers.get("host"),
             )
 
             results.append(result)
@@ -249,12 +188,19 @@ async def segment_clothing(
 
 
 @router.delete("/api/delete/{file_id}")
-async def delete_output_endpoint(file_id: str, storage: StorageDependency, db: DatabaseDependency):
-    image = await db.fetch_one("SELECT storage_url FROM images WHERE id = %s", (file_id,))
+async def delete_output_endpoint(file_id: str, storage: StorageDependency):
+    image = None
+    db = None
+
+    try:
+        db = await get_database()
+        image = await db.fetch_one("SELECT storage_url FROM images WHERE id = %s", (file_id,))
+    except Exception:
+        image = None
 
     deleted = delete_output(file_id, storage, image_storage_url=image["storage_url"] if image else None)
 
-    if image:
+    if image and db is not None:
         await db.execute("DELETE FROM images WHERE id = %s", (file_id,))
         deleted.append("db_record")
 
