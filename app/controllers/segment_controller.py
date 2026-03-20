@@ -61,6 +61,47 @@ def get_storage():
     return storage_service
 
 
+async def _get_optional_db(request: Request) -> Any | None:
+    try:
+        db = await get_database()
+        set_runtime_component(request.app, "database", True, "connection pool initialized")
+        return db
+    except Exception as exc:
+        set_runtime_component(request.app, "database", False, str(exc))
+        add_runtime_warning(request.app, f"Database initialization failed: {exc}")
+        return None
+
+
+def _build_detection_record(obj: dict[str, Any]) -> dict[str, Any]:
+    bbox = obj.get("bbox") or {}
+    contours = obj.get("contours", [])
+
+    bbox_x = int(bbox.get("x", 0))
+    bbox_y = int(bbox.get("y", 0))
+    bbox_w = int(bbox.get("w", 0))
+    bbox_h = int(bbox.get("h", 0))
+
+    if (bbox_w <= 0 or bbox_h <= 0) and contours and contours[0]:
+        xs = [point["x"] for point in contours[0]]
+        ys = [point["y"] for point in contours[0]]
+        bbox_x = min(xs)
+        bbox_y = min(ys)
+        bbox_w = max(xs) - bbox_x
+        bbox_h = max(ys) - bbox_y
+
+    return {
+        "label": obj.get("class_name", "unknown"),
+        "confidence": float(obj.get("confidence", 0.0)),
+        "bbox_x": bbox_x,
+        "bbox_y": bbox_y,
+        "bbox_w": bbox_w,
+        "bbox_h": bbox_h,
+        "contours": contours,
+        "simplified": True,
+        "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
+    }
+
+
 UploadedFiles = Annotated[list[UploadFile], File(...)]
 LoadedModel = Annotated[Any, Depends(get_model)]
 StorageDependency = Annotated[Any, Depends(get_storage)]
@@ -153,6 +194,7 @@ async def segment_clothing(
     max_file_size_kb = 500
     max_file_size_bytes = max_file_size_kb * 1024
     filename = "upload.jpg"
+    db = await _get_optional_db(request)
 
     for file in files:
         filename = file.filename if file.filename is not None else "upload.jpg"
@@ -176,6 +218,31 @@ async def segment_clothing(
                 storage,
                 request.headers.get("host"),
             )
+
+            if db is not None:
+                try:
+                    segmentation_data = result.get("segmentation_data", {})
+                    objects = segmentation_data.get("objects", [])
+                    detection_records = [_build_detection_record(obj) for obj in objects]
+                    storage_key = result.get("original_image_key")
+
+                    if storage_key:
+                        await db.create_image_with_detections(
+                            image_id=result["file_id"],
+                            storage_url=storage_key,
+                            width=segmentation_data.get("image_width", 0),
+                            height=segmentation_data.get("image_height", 0),
+                            file_size=file_size,
+                            hash=None,
+                            detections=detection_records,
+                        )
+                    else:
+                        add_runtime_warning(
+                            request.app,
+                            f"Skipped database persistence for {filename}: original image key unavailable",
+                        )
+                except Exception as exc:
+                    add_runtime_warning(request.app, f"Database persistence failed for {filename}: {exc}")
 
             results.append(result)
         except HTTPException:
