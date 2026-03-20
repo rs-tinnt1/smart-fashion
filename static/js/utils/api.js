@@ -14,23 +14,22 @@ async function readErrorMessage(response) {
 }
 
 /**
- * Segment a single image via API with light retry for Render cold starts.
+ * Upload a single image and create a background job.
  * @param {File} file - Image file
- * @returns {Promise<Object>} First segmentation result
+ * @returns {Promise<Object>} Upload response with job metadata
  */
-export async function segmentImage(file) {
+export async function uploadImage(file) {
   const formData = new FormData();
-  formData.append("files", file);
+  formData.append("file", file);
 
   for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const response = await fetch("/api/segment", {
+    const response = await fetch("/api/upload", {
       method: "POST",
       body: formData,
     });
 
     if (response.ok) {
-      const payload = await response.json();
-      return payload.results?.[0] || payload;
+      return response.json();
     }
 
     if (response.status === 503 && attempt < 2) {
@@ -41,18 +40,46 @@ export async function segmentImage(file) {
     throw new Error(await readErrorMessage(response));
   }
 
-  throw new Error("Processing failed");
+  throw new Error("Upload failed");
 }
 
 /**
- * Segment multiple images sequentially.
- * @param {File[]} files - Array of image files
- * @returns {Promise<Object[]>} Segmentation results
+ * Get background job status.
+ * @param {string} jobId - Job identifier
+ * @returns {Promise<Object>} Job status payload
  */
-export async function segmentImages(files) {
+export async function getJobStatus(jobId) {
+  const response = await fetch(`/api/jobs/${jobId}`);
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return response.json();
+}
+
+/**
+ * Get processed image details.
+ * @param {string} imageId - Image identifier
+ * @returns {Promise<Object>} Image payload
+ */
+export async function getImage(imageId) {
+  const response = await fetch(`/api/images/${imageId}`);
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response));
+  }
+
+  return response.json();
+}
+
+/**
+ * Upload multiple images sequentially.
+ * @param {File[]} files - Array of image files
+ * @returns {Promise<Object[]>} Upload responses
+ */
+export async function uploadImages(files) {
   const results = [];
   for (const file of files) {
-    results.push(await segmentImage(file));
+    results.push(await uploadImage(file));
   }
   return results;
 }

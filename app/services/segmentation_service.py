@@ -103,9 +103,7 @@ def _process_one_image(image_bytes: bytes, model: Any) -> dict[str, Any]:
                 }
             )
 
-    # ── Path B: Detection-only model (no masks) ──────────────────────────────
-    # Render Free cannot afford per-box GrabCut on large uploads. When the
-    # active model is detection-only, return a rectangle polygon immediately.
+    # ── Path B: Detection-only model (no masks) — use GrabCut to extract polygon ──
     else:
         for i in range(len(class_ids)):
             bbox = boxes_xyxy[i]
@@ -116,13 +114,59 @@ def _process_one_image(image_bytes: bytes, model: Any) -> dict[str, Any]:
             x1, y1 = max(0, x1), max(0, y1)
             x2, y2 = min(img_width, x2), min(img_height, y2)
 
-            rect_polygon = [
-                {"x": x1, "y": y1},
-                {"x": x2, "y": y1},
-                {"x": x2, "y": y2},
-                {"x": x1, "y": y2},
-            ]
-            contours_data = [rect_polygon]
+            w, h = x2 - x1, y2 - y1
+
+            contours_data = []
+            rect: tuple[int, int, int, int] = (x1, y1, w, h)
+
+            # Attempt to extract precise foreground mask using GrabCut
+            if w > 10 and h > 10:
+                try:
+                    gc_mask = np.zeros((img_height, img_width), np.uint8)
+                    bgd_model = np.zeros((1, 65), np.float64)
+                    fgd_model = np.zeros((1, 65), np.float64)
+
+                    # Run GrabCut for 3 iterations
+                    cv2.grabCut(image, gc_mask, rect, bgd_model, fgd_model, 3, cv2.GC_INIT_WITH_RECT)
+
+                    # 0, 2 are background; 1, 3 are foreground
+                    mask_binary = np.where((gc_mask == 1) | (gc_mask == 3), 255, 0).astype("uint8")
+
+                    # Cleanup mask with morphology
+                    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+                    mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_OPEN, kernel, iterations=1)
+                    mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+                    contours, _ = cv2.findContours(mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                    if contours:
+                        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+                        largest_area = cv2.contourArea(contours[0])
+
+                        valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) >= largest_area * 0.15]
+
+                        # Smooth polygons
+                        smoothed = []
+                        for cnt in valid_contours:
+                            epsilon = 0.002 * cv2.arcLength(cnt, True)
+                            approx = cv2.approxPolyDP(cnt, epsilon, True)
+                            if len(approx) > 2:
+                                smoothed.append(approx)
+
+                        if smoothed:
+                            contours_data = [_contour_to_points(contour) for contour in smoothed]
+                except Exception as e:
+                    print(f"GrabCut failed for bbox {rect}: {e}")
+
+            # Fallback strictly to rectangle if GrabCut returned empty contours
+            if not contours_data:
+                rect_polygon = [
+                    {"x": x1, "y": y1},
+                    {"x": x2, "y": y1},
+                    {"x": x2, "y": y2},
+                    {"x": x1, "y": y2},
+                ]
+                contours_data = [rect_polygon]
 
             export_data["objects"].append(
                 {

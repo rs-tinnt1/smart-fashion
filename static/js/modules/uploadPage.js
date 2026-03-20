@@ -2,7 +2,7 @@
 
 import { FileHandler } from "./fileHandler.js";
 import { prependResult } from "./imageProcessor.js";
-import { segmentImage } from "../utils/api.js";
+import { getImage, getJobStatus, uploadImage } from "../utils/api.js";
 import { formatFileSize } from "../utils/formatters.js";
 import { show, hide, clearElement } from "../utils/dom.js";
 
@@ -140,25 +140,14 @@ function setupProcessButton(
     show(loading);
     updateQueueSummary(fileHandler, processBtn, true);
 
-    while (true) {
-      const job = fileHandler.getNextWaitingFile();
-      if (!job) break;
+    const jobsToUpload = [...fileHandler.getFiles()].filter((job) => job.status === "waiting");
 
-      fileHandler.markProcessing(job.id);
-      updateFilePreview(fileHandler, fileList, filePreview, processBtn, true);
-
+    for (const job of jobsToUpload) {
       try {
-        const result = await segmentImage(job.file);
-        prependResult(
-          {
-            ...result,
-            filename: result.filename || job.file.name,
-            preview_url: URL.createObjectURL(job.file),
-          },
-          resultsContainer,
-          resultsSection
-        );
-        fileHandler.removeFile(job.id);
+        const upload = await uploadImage(job.file);
+        fileHandler.attachRemoteJob(job.id, upload.job_id, upload.image_id);
+        fileHandler.markQueued(job.id);
+        updateFilePreview(fileHandler, fileList, filePreview, processBtn, true);
       } catch (error) {
         console.error("Error processing image:", error);
         fileHandler.markFailed(job.id, error.message || "Processing failed");
@@ -166,6 +155,8 @@ function setupProcessButton(
 
       updateFilePreview(fileHandler, fileList, filePreview, processBtn, true);
     }
+
+    await pollQueuedJobs(fileHandler, fileList, filePreview, processBtn, resultsContainer, resultsSection);
 
     setIsProcessing(false);
     hide(loading);
@@ -203,11 +194,13 @@ function updateFilePreview(fileHandler, fileList, filePreview, processBtn, isPro
 function createFileItem(job, fileHandler, fileList, filePreview, processBtn, isProcessing) {
   const statusColor = {
     waiting: "#9AA3AE",
+    queued: "#A67C52",
     processing: "#6B8E9E",
     failed: "#C75B39",
   };
   const statusLabel = {
     waiting: "Waiting",
+    queued: "Queued",
     processing: "Processing",
     failed: "Failed",
   };
@@ -259,6 +252,7 @@ function updateQueueSummary(fileHandler, processBtn, isProcessing = false) {
 
   const total = fileHandler.getFiles().length;
   const waiting = fileHandler.countByStatus("waiting");
+  const queued = fileHandler.countByStatus("queued");
   const processing = fileHandler.countByStatus("processing");
   const failed = fileHandler.countByStatus("failed");
 
@@ -276,8 +270,63 @@ function updateQueueSummary(fileHandler, processBtn, isProcessing = false) {
 
   processBtn.disabled = isProcessing;
   processBtn.textContent = isProcessing
-    ? `Queue Running (${processing || 1} processing, ${waiting} waiting)`
+    ? `Queue Running (${processing} processing, ${queued} queued, ${waiting} uploading)`
     : `Process Queue (${total}/100)`;
+}
+
+async function pollQueuedJobs(
+  fileHandler,
+  fileList,
+  filePreview,
+  processBtn,
+  resultsContainer,
+  resultsSection
+) {
+  while (true) {
+    const activeJobs = fileHandler.getFiles().filter((job) => ["queued", "processing"].includes(job.status));
+    if (activeJobs.length === 0) {
+      return;
+    }
+
+    for (const job of activeJobs) {
+      try {
+        const status = await getJobStatus(job.remoteJobId);
+
+        if (status.status === "processing") {
+          fileHandler.markProcessing(job.id);
+        } else if (status.status === "done") {
+          const result = await getImage(status.image_id);
+          prependResult(
+            {
+              filename: job.file.name,
+              file_id: result.id,
+              original_image_url: result.storage_url,
+              preview_url: result.storage_url,
+              segmentation_data: {
+                image_width: result.width,
+                image_height: result.height,
+                objects: (result.detections || []).map((detection) => ({
+                  class_name: detection.label,
+                })),
+              },
+            },
+            resultsContainer,
+            resultsSection
+          );
+          fileHandler.removeFile(job.id);
+        } else if (status.status === "error") {
+          fileHandler.markFailed(job.id, status.error_message || "Background processing failed");
+        }
+      } catch (error) {
+        console.error("Error polling job:", error);
+        fileHandler.markFailed(job.id, error.message || "Polling failed");
+      }
+
+      updateFilePreview(fileHandler, fileList, filePreview, processBtn, true);
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
 }
 
 /**

@@ -1,5 +1,5 @@
 -- Smart Fashion Database Schema
--- MariaDB 11.x compatible
+-- MySQL-compatible schema (validated with MariaDB 11.x)
 
 -- Drop tables if exist (for clean re-creation)
 DROP TABLE IF EXISTS embeddings;

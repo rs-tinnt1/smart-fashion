@@ -1,5 +1,5 @@
 """
-Gallery Controller with MariaDB Integration
+Gallery Controller with MySQL-Compatible Integration
 
 Provides gallery page and API endpoints for viewing processed images.
 """
@@ -338,7 +338,7 @@ async def api_gallery_image(image_id: str, db: DatabaseDependency, storage: Stor
     )
 
     # Get URLs
-    original_url = storage.get_presigned_url(image["storage_url"])
+    original_url = storage.get_public_url(image["storage_url"])
     return {
         "id": image["id"],
         "original_url": original_url,

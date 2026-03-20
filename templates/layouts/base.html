@@ -20,7 +20,7 @@
     {% block extra_head %}{% endblock %}
   </head>
 
-  <body class="overflow-x-hidden" data-page="{% block page_identifier %}{% endblock %}">
+  <body class="overflow-x-hidden" data-page="{% block page_identifier %}{% endblock %}" data-app-version="{{ APP_VERSION }}">
     {% block navigation %}{% endblock %}
 
     <main class="pt-24">

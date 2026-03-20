@@ -1,5 +1,5 @@
 """
-MariaDB Database Service for Smart Fashion Application
+MySQL-Compatible Database Service for Smart Fashion Application
 
 Provides async connection pool and CRUD operations using aiomysql.
 """
@@ -51,7 +51,7 @@ def _build_ssl_context() -> ssl.SSLContext | None:
 
 
 class DatabaseService:
-    """Async MariaDB connection pool manager."""
+    """Async MySQL-compatible connection pool manager."""
 
     _instance = None
     _pool: aiomysql.Pool | None = None
@@ -60,11 +60,21 @@ class DatabaseService:
     async def get_instance(cls) -> DatabaseService:
         """Get singleton instance of DatabaseService."""
         if cls._instance is None:
-            cls._instance = DatabaseService()
-            await cls._instance._init_pool()
+            instance = DatabaseService()
+            try:
+                await instance._init_pool()
+            except Exception:
+                cls._instance = None
+                raise
+            cls._instance = instance
+
         instance = cls._instance
         if instance is None:
             raise RuntimeError("Database service failed to initialize")
+
+        if instance._pool is None:
+            await instance._init_pool()
+
         return instance
 
     async def _init_pool(self):

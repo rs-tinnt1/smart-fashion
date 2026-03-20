@@ -45,7 +45,7 @@ UVICORN_WORKERS = _get_int_env("UVICORN_WORKERS", default=1)
 
 STATIC_DIR = Path("static")
 
-# DB settings (MariaDB/MySQL) - parse from connection string
+# DB settings (MySQL-compatible) - parse from connection string
 DB_URL = _get_env(
     "DB_URL",
     default=(
@@ -70,6 +70,7 @@ DB_SSL_KEY = _get_env("DB_SSL_KEY", default=_db_query.get("ssl-key", _db_query.g
 
 # S3/R2 config (Cloudflare R2 is S3-compatible)
 S3_ENDPOINT = _get_env("S3_ENDPOINT", default="https://account.r2.cloudflarestorage.com")
+S3_PUBLIC_ENDPOINT = _get_env("S3_PUBLIC_ENDPOINT", default="")
 S3_ACCESS_KEY_ID = _get_env("S3_ACCESS_KEY_ID", default="")
 S3_SECRET_ACCESS_KEY = _get_env("S3_SECRET_ACCESS_KEY", default="")
 S3_BUCKET = _get_env("S3_BUCKET", default="smartfashion")

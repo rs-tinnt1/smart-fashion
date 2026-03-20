@@ -56,6 +56,17 @@ The home page is tuned for a single free Render web service:
 
 This profile keeps the app usable on Render Free, but it is still best-effort: cold starts and the first lazy model load can still be slow.
 
+### Local Demo Workflow
+
+The `develop` branch is intended for the full local demo flow: multi-image upload, database-backed queue, background worker processing, and polygon masks.
+
+- start the web app and worker together with `docker compose -f compose.yml up --build`
+- the compose stack starts local `mysql`, `minio`, `app`, and `worker` services automatically
+- MySQL loads `db/schema.sql` on first boot, and MinIO creates the `smartfashion` bucket for local object storage
+- local containers talk to MinIO via `http://minio:9000`, while the browser loads images through `S3_PUBLIC_ENDPOINT=http://localhost:9000`
+- if you want to keep using a hosted database or external object storage, set `DB_URL` and S3 variables before starting compose to override the local defaults
+- the home page uploads images immediately, then polls background jobs until the worker finishes them
+
 ## 🛠️ Configuration (.env)
 
 | Variable | Default | Description |
@@ -63,8 +74,9 @@ This profile keeps the app usable on Render Free, but it is still best-effort: c
 | `UVICORN_WORKERS` | 1 | Number of ASGI workers |
 | `OMP_NUM_THREADS` | 4 | CPU threads allocated strictly for model inference |
 | `MODEL_SEGMENT` | `yolov8n-clothing-detection.pt` | Primary detection/segmentation model key in object storage |
-| `DB_URL` | | Connection string for MariaDB/MySQL (e.g., Aiven) |
-| `S3_ENDPOINT` | | Cloudflare R2 endpoint |
+| `DB_URL` | | Connection string for MySQL-compatible databases (e.g., local Docker or Aiven) |
+| `S3_ENDPOINT` | | S3-compatible endpoint (e.g., local MinIO or Cloudflare R2) |
+| `S3_PUBLIC_ENDPOINT` | | Browser-facing object storage endpoint for local/containerized setups |
 | `S3_BUCKET` | | Bucket Name |
 | `S3_ACCESS_KEY_ID` / `SECRET` | | S3 Credentials |
 

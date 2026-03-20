@@ -63,7 +63,7 @@ async def upload_image(file: UploadedImage, db: DatabaseDependency, storage: Sto
     file_size = len(content)
 
     # Validate file size (max 500KB)
-    max_file_size_kb = 500
+    max_file_size_kb = 1024
     max_file_size_bytes = max_file_size_kb * 1024
     if file_size > max_file_size_bytes:
         raise HTTPException(
@@ -128,7 +128,7 @@ async def get_image(image_id: str, db: DatabaseDependency, storage: StorageDepen
         )
 
     # Get presigned URL for storage
-    storage_url = storage.get_presigned_url(image["storage_url"]) or image["storage_url"]
+    storage_url = storage.get_public_url(image["storage_url"])
 
     return ImageResponse(
         id=image["id"],

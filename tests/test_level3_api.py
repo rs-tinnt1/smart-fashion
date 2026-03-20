@@ -1,203 +1,280 @@
-"""
-Level 3: API Endpoint Layer Tests
+from __future__ import annotations
 
-Tests for FastAPI endpoints.
-These tests verify that API endpoints work correctly with services.
-"""
-
+import json
 import uuid
-from pathlib import Path
+from datetime import datetime
 
-import httpx
 import pytest
+
+from app.controllers import gallery_controller, segment_controller
 
 
 class TestHealthEndpoint:
-    """INT-API-001: Health Check Endpoint Tests"""
-
-    @pytest.mark.level3
-    def test_health_check_returns_200(self, base_url):
-        """Verify health endpoint returns 200."""
-        response = httpx.get(f"{base_url}/api/health", timeout=10.0)
+    def test_health_check_returns_200(self, test_client):
+        response = test_client.get("/api/health")
         assert response.status_code == 200
 
-    @pytest.mark.level3
-    def test_health_check_response_format(self, base_url):
-        """Verify health endpoint response format."""
-        response = httpx.get(f"{base_url}/api/health", timeout=10.0)
-        data = response.json()
-
-        assert "status" in data
+    def test_health_check_response_format(self, test_client):
+        data = test_client.get("/api/health").json()
         assert data["status"] == "healthy"
-        assert "model_loaded" in data
-        assert "timestamp" in data
+        assert data["model_loaded"] is True
+        assert data["model_name"] == "fake-seg.pt"
 
-    @pytest.mark.level3
-    def test_health_check_model_loaded(self, base_url):
-        """Verify model is loaded."""
-        response = httpx.get(f"{base_url}/api/health", timeout=10.0)
-        data = response.json()
-        assert data["model_loaded"] is True, "Model should be loaded"
+    def test_readiness_check_returns_ready(self, test_client):
+        response = test_client.get("/api/readyz")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ready"
+
+    def test_liveness_check_returns_ok(self, test_client):
+        response = test_client.get("/api/healthz")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+
+    def test_readiness_check_returns_503_when_storage_missing(self, test_client, monkeypatch):
+        monkeypatch.setattr(segment_controller, "storage_service", None)
+        response = test_client.get("/api/readyz")
+        assert response.status_code == 503
 
 
 class TestSegmentEndpoint:
-    """INT-API-002, INT-API-003, INT-API-004: Segment Endpoint Tests"""
-
-    @pytest.mark.level3
-    @pytest.mark.slow
-    def test_segment_single_image(self, base_url, test_image_path):
-        """INT-API-002: Test segment endpoint with single image."""
-        if test_image_path is None:
-            pytest.skip("No test image available")
-
-        with open(test_image_path, "rb") as f:
-            files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+    def test_segment_single_image(self, test_client, test_image_bytes, fake_db):
+        response = test_client.post(
+            "/api/segment",
+            files={"files": ("sample.png", test_image_bytes, "image/png")},
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "results" in data
+        assert data["processed_images"] == 1
         assert len(data["results"]) == 1
+        assert len(fake_db.images) == 1
 
-    @pytest.mark.level3
-    @pytest.mark.slow
-    def test_segment_returns_file_id(self, base_url, test_image_path):
-        """INT-API-002: Test that segment returns a valid file_id."""
-        if test_image_path is None:
-            pytest.skip("No test image available")
+    def test_segment_returns_file_id(self, test_client, test_image_bytes):
+        result = test_client.post(
+            "/api/segment",
+            files={"files": ("sample.png", test_image_bytes, "image/png")},
+        ).json()["results"][0]
 
-        with open(test_image_path, "rb") as f:
-            files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+        uuid.UUID(result["file_id"])
 
+    def test_segment_saves_to_database(self, test_client, test_image_bytes):
+        response = test_client.post(
+            "/api/segment",
+            files={"files": ("sample.png", test_image_bytes, "image/png")},
+        )
+        file_id = response.json()["results"][0]["file_id"]
+
+        gallery = test_client.get("/api/gallery").json()
+        image_ids = [img["id"] for img in gallery["images"]]
+        assert file_id in image_ids
+
+    def test_segment_presigned_url_format(self, test_client, test_image_bytes):
+        result = test_client.post(
+            "/api/segment",
+            files={"files": ("sample.png", test_image_bytes, "image/png")},
+        ).json()["results"][0]
+
+        assert result["original_image_url"].startswith("https://example.test/")
+
+    def test_reject_large_file(self, test_client):
+        large_content = b"0" * (600 * 1024)
+        response = test_client.post("/api/segment", files={"files": ("large.jpg", large_content, "image/jpeg")})
+
+        assert response.status_code == 400
+        assert "exceeds" in response.json()["detail"]
+
+    def test_delete_image_endpoint(self, test_client, test_image_bytes, fake_storage):
+        result = test_client.post(
+            "/api/segment",
+            files={"files": ("sample.png", test_image_bytes, "image/png")},
+        ).json()["results"][0]
+
+        response = test_client.delete(f"/api/delete/{result['file_id']}")
+
+        assert response.status_code == 200
+        assert fake_storage.objects == {}
+
+    def test_delete_missing_image_returns_404(self, test_client):
+        response = test_client.delete("/api/delete/missing-id")
+        assert response.status_code == 404
+
+    def test_stats_endpoint_returns_payload(self, test_client):
+        response = test_client.get("/api/stats")
+        assert response.status_code == 200
+        assert response.json()["total_images"] == 0
+
+
+class TestUploadAndJobEndpoints:
+    def test_upload_creates_job(self, test_client, test_image_bytes, fake_db):
+        response = test_client.post("/api/upload", files={"file": ("queued.png", test_image_bytes, "image/png")})
         data = response.json()
-        result = data["results"][0]
 
-        assert "file_id" in result
-        # Verify UUID format
-        try:
-            uuid.UUID(result["file_id"])
-        except ValueError:
-            pytest.fail(f"file_id is not a valid UUID: {result['file_id']}")
+        assert response.status_code == 200
+        assert data["status"] == "queued"
+        assert data["image_id"] in fake_db.images
+        assert data["job_id"] in fake_db.jobs
 
-    @pytest.mark.level3
-    @pytest.mark.slow
-    def test_segment_saves_to_database(self, base_url, test_image_path):
-        """INT-API-003: Test that segment saves data to database."""
-        if test_image_path is None:
-            pytest.skip("No test image available")
+    def test_get_job_status(self, test_client, test_image_bytes):
+        upload = test_client.post("/api/upload", files={"file": ("queued.png", test_image_bytes, "image/png")}).json()
 
-        with open(test_image_path, "rb") as f:
-            files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
+        response = test_client.get(f"/api/jobs/{upload['job_id']}")
+        assert response.status_code == 200
+        assert response.json()["status"] == "pending"
 
+    def test_upload_rejects_non_image(self, test_client):
+        response = test_client.post("/api/upload", files={"file": ("note.txt", b"hello", "text/plain")})
+        assert response.status_code == 400
+
+    def test_upload_rejects_large_file(self, test_client):
+        response = test_client.post("/api/upload", files={"file": ("big.png", b"0" * (600 * 1024), "image/png")})
+        assert response.status_code == 400
+
+    def test_get_image_details(self, test_client, fake_db):
+        image_id = "img-1"
+        fake_db.images[image_id] = {
+            "id": image_id,
+            "storage_url": "uploads/img-1.png",
+            "width": 20,
+            "height": 10,
+            "file_size": 123,
+            "hash": None,
+            "uploaded_at": datetime.utcnow(),
+        }
+        detection_id = awaitable_uuid(fake_db, image_id)
+
+        response = test_client.get(f"/api/images/{image_id}")
         data = response.json()
-        file_id = data["results"][0]["file_id"]
+        assert response.status_code == 200
+        assert data["id"] == image_id
+        assert data["detections"][0]["id"] == detection_id
+        assert data["storage_url"].startswith("https://example.test/")
 
-        # Verify image exists in gallery
-        gallery_response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
-        gallery_data = gallery_response.json()
+    def test_get_detection_details(self, test_client, fake_db):
+        image_id = "img-2"
+        fake_db.images[image_id] = {
+            "id": image_id,
+            "storage_url": "uploads/img-2.png",
+            "width": 30,
+            "height": 20,
+            "file_size": 456,
+            "hash": None,
+            "uploaded_at": datetime.utcnow(),
+        }
+        detection_id = awaitable_uuid(fake_db, image_id)
+        fake_db.polygons[detection_id] = {
+            "id": "poly",
+            "points_json": json.dumps([[{"x": 1, "y": 2}]]),
+            "simplified": True,
+        }
+        fake_db.embeddings[detection_id] = {"id": "emb", "model_name": "demo", "vector": json.dumps([0.1] * 16)}
 
-        image_ids = [img["id"] for img in gallery_data["images"]]
-        assert file_id in image_ids, f"Image {file_id} should be in gallery"
-
-    @pytest.mark.level3
-    @pytest.mark.slow
-    def test_segment_presigned_url_format(self, base_url, test_image_path):
-        """INT-API-004: Test that segment returns a usable original image URL."""
-        if test_image_path is None:
-            pytest.skip("No test image available")
-
-        with open(test_image_path, "rb") as f:
-            files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
-
+        response = test_client.get(f"/api/detections/{detection_id}")
         data = response.json()
-        result = data["results"][0]
-        original_url = result.get("original_image_url", "")
+        assert response.status_code == 200
+        assert data["polygon"]["points"][0][0]["x"] == 1
+        assert len(data["embedding"]) == 10
 
-        assert original_url, "Segment response should include original_image_url"
-        assert original_url.startswith("http"), f"URL should be absolute, got: {original_url}"
-        assert "minio:9000" not in original_url, f"URL should NOT use minio:9000, got: {original_url}"
-
-    @pytest.mark.level3
-    @pytest.mark.slow
-    def test_segment_presigned_url_accessible(self, base_url, test_image_path):
-        """INT-API-004: Test that presigned URL is accessible."""
-        if test_image_path is None:
-            pytest.skip("No test image available")
-
-        with open(test_image_path, "rb") as f:
-            files = {"files": (Path(test_image_path).name, f, "image/png")}
-            response = httpx.post(f"{base_url}/api/segment", files=files, timeout=60.0)
-
-        data = response.json()
-        original_url = data["results"][0].get("original_image_url")
-
-        if original_url:
-            url_response = httpx.get(original_url, timeout=10.0)
-            assert url_response.status_code == 200, f"URL should be accessible, got: {url_response.status_code}"
+    def test_get_image_and_detection_404(self, test_client):
+        assert test_client.get("/api/images/missing").status_code == 404
+        assert test_client.get("/api/detections/missing").status_code == 404
+        assert test_client.get("/api/jobs/missing").status_code == 404
 
 
 class TestGalleryEndpoint:
-    """INT-API-005: Gallery Endpoint Tests"""
+    def test_gallery_returns_200(self, test_client):
+        assert test_client.get("/api/gallery").status_code == 200
 
-    @pytest.mark.level3
-    def test_gallery_returns_200(self, base_url):
-        """Verify gallery endpoint returns 200."""
-        response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
-        assert response.status_code == 200
-
-    @pytest.mark.level3
-    def test_gallery_response_format(self, base_url):
-        """Verify gallery endpoint response format."""
-        response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
-        data = response.json()
-
+    def test_gallery_response_format(self, test_client):
+        data = test_client.get("/api/gallery").json()
         assert "images" in data
         assert "count" in data
-        assert isinstance(data["images"], list)
-        assert data["count"] == len(data["images"])
 
-    @pytest.mark.level3
-    def test_gallery_image_has_required_fields(self, base_url):
-        """Verify gallery images have required fields."""
-        response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
-        data = response.json()
+    def test_gallery_image_has_required_fields(self, test_client, test_image_bytes):
+        test_client.post("/api/segment", files={"files": ("sample.png", test_image_bytes, "image/png")})
+        image = test_client.get("/api/gallery").json()["images"][0]
+        assert {"id", "original_url", "detection_count"}.issubset(image)
 
-        if len(data["images"]) > 0:
-            image = data["images"][0]
-            assert "id" in image
-            assert "original_url" in image
-            assert "detection_count" in image
+    def test_gallery_urls_do_not_use_minio(self, test_client, test_image_bytes):
+        test_client.post("/api/segment", files={"files": ("sample.png", test_image_bytes, "image/png")})
+        image = test_client.get("/api/gallery").json()["images"][0]
+        assert "minio:9000" not in image["original_url"]
 
-    @pytest.mark.level3
-    def test_gallery_urls_do_not_use_minio(self, base_url):
-        """INT-API-005: Verify gallery URLs do not point to legacy MinIO hosts."""
-        response = httpx.get(f"{base_url}/api/gallery", timeout=10.0)
-        data = response.json()
+    def test_product_detail_and_gallery_image_api(self, test_client, test_image_bytes):
+        result = test_client.post(
+            "/api/segment", files={"files": ("sample.png", test_image_bytes, "image/png")}
+        ).json()["results"][0]
 
-        for image in data["images"]:
-            original_url = image.get("original_url", "")
-            if original_url:
-                assert original_url.startswith("http") or original_url.startswith("/")
-                assert "minio:9000" not in original_url
+        product = test_client.get(f"/product/{result['file_id']}")
+        detail = test_client.get(f"/api/gallery/{result['file_id']}")
+
+        assert product.status_code == 200
+        assert detail.status_code == 200
+        assert detail.json()["id"] == result["file_id"]
+        assert detail.json()["original_url"].startswith("https://example.test/")
+
+    def test_product_and_gallery_detail_404(self, test_client):
+        assert test_client.get("/product/missing").status_code == 404
+        assert test_client.get("/api/gallery/missing").status_code == 404
+
+    def test_gallery_gracefully_handles_missing_database(self, test_client, monkeypatch):
+        async def broken_db(*args, **kwargs):
+            raise RuntimeError("db offline")
+
+        monkeypatch.setattr(gallery_controller, "get_database", broken_db)
+        response = test_client.get("/api/gallery")
+        assert response.status_code == 200
+        assert response.json()["available"] is False
+
+    def test_product_detail_returns_503_when_db_missing(self, test_client, monkeypatch):
+        async def broken_db(*args, **kwargs):
+            raise RuntimeError("db offline")
+
+        monkeypatch.setattr(gallery_controller, "get_database", broken_db)
+        assert test_client.get("/product/some-id").status_code == 503
+        assert test_client.get("/api/gallery/some-id").status_code == 503
 
 
-class TestFileSizeValidation:
-    """INT-API-006: File Size Validation Tests"""
+def awaitable_uuid(fake_db, image_id: str) -> str:
+    detection_id = str(uuid.uuid4())
+    fake_db.detections[detection_id] = {
+        "id": detection_id,
+        "image_id": image_id,
+        "label": "shirt",
+        "confidence": 0.9,
+        "bbox_x": 1,
+        "bbox_y": 2,
+        "bbox_w": 3,
+        "bbox_h": 4,
+    }
+    return detection_id
 
-    @pytest.mark.level3
-    @pytest.mark.xfail(reason="Known issue: File validation may return 500 due to content-type issues with fake files")
-    def test_reject_large_file(self, base_url):
-        """Test that files > 500KB are rejected."""
-        # Create a large fake file (600KB of zeros)
-        large_content = b"\x00" * (600 * 1024)
 
-        files = {"files": ("large_file.jpg", large_content, "image/jpeg")}
-        response = httpx.post(f"{base_url}/api/segment", files=files, timeout=30.0)
+class TestHelperFunctions:
+    def test_build_detection_record_fills_bbox_from_contours(self):
+        record = segment_controller._build_detection_record(
+            {
+                "class_name": "dress",
+                "confidence": 0.5,
+                "bbox": {"x": 0, "y": 0, "w": 0, "h": 0},
+                "contours": [[{"x": 2, "y": 3}, {"x": 7, "y": 9}]],
+            }
+        )
 
-        assert response.status_code == 400, "Large files should be rejected with 400"
-        data = response.json()
-        assert "exceeds" in data.get("detail", "").lower() or "size" in data.get("detail", "").lower()
+        assert record["bbox_x"] == 2
+        assert record["bbox_h"] == 6
+
+    def test_load_model_on_demand_error_paths(self, monkeypatch):
+        monkeypatch.setattr(segment_controller, "storage_service", None)
+        with pytest.raises(Exception):
+            segment_controller._load_model_on_demand(None)
+
+        monkeypatch.setattr(segment_controller, "storage_service", object())
+        monkeypatch.setattr(segment_controller, "model", None)
+
+        def broken_loader(storage):
+            raise RuntimeError("model fail")
+
+        monkeypatch.setattr("app.services.inference_service.load_best_segment_model", broken_loader)
+        with pytest.raises(Exception):
+            segment_controller._load_model_on_demand(None)

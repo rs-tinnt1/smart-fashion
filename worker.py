@@ -14,14 +14,12 @@ if sys.platform == "win32":
 import traceback
 from pathlib import Path
 
-import cv2
-import numpy as np
-
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.services.database_service import DatabaseService, close_database, get_database
 from app.services.inference_service import YOLOSegmentation, load_best_segment_model
+from app.services.segmentation_service import _process_one_image
 from app.services.storage_service import StorageService, get_storage_service
 
 
@@ -81,57 +79,27 @@ class Worker:
             if image_bytes is None:
                 raise RuntimeError(f"Failed to download image: {storage_url}")
 
-            # Load image
-            arr = np.frombuffer(image_bytes, np.uint8)
-            image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if image is None:
-                raise ValueError("Could not decode image")
+            segmentation = _process_one_image(image_bytes, self.model)
+            export_data = segmentation["json_data"]
+            detections_to_persist = []
 
-            img_height, img_width = image.shape[:2]
+            for obj in export_data.get("objects", []):
+                bbox = obj.get("bbox") or {}
+                detections_to_persist.append(
+                    {
+                        "label": obj.get("class_name", "unknown"),
+                        "confidence": float(obj.get("confidence", 0.0)),
+                        "bbox_x": int(bbox.get("x", 0)),
+                        "bbox_y": int(bbox.get("y", 0)),
+                        "bbox_w": int(bbox.get("w", 0)),
+                        "bbox_h": int(bbox.get("h", 0)),
+                        "contours": obj.get("contours", []),
+                        "simplified": True,
+                        "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
+                    }
+                )
 
-            # Run inference
-            results = self.model(image, conf=0.25, iou=0.45, retina_masks=True)
-
-            # Process results
-            if results[0].masks is not None:
-                masks = results[0].masks.data.cpu().numpy()
-                class_ids = results[0].boxes.cls.cpu().numpy()
-                confidences = results[0].boxes.conf.cpu().numpy()
-                boxes_xyxy = results[0].boxes.xyxy.cpu().numpy()
-                class_names = results[0].names
-                detections_to_persist = []
-
-                for i, mask in enumerate(masks):
-                    # Get detection info
-                    class_id = int(class_ids[i])
-                    class_name = class_names[class_id]
-                    confidence = float(confidences[i])
-
-                    # Get bounding box
-                    bbox = boxes_xyxy[i]
-                    x1, y1, x2, y2 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
-                    bbox_x, bbox_y = x1, y1
-                    bbox_w, bbox_h = x2 - x1, y2 - y1
-
-                    # Process mask to get contours
-                    contours_data = self._process_mask(mask, img_width, img_height, x1, y1, x2, y2)
-
-                    detections_to_persist.append(
-                        {
-                            "label": class_name,
-                            "confidence": confidence,
-                            "bbox_x": bbox_x,
-                            "bbox_y": bbox_y,
-                            "bbox_w": bbox_w,
-                            "bbox_h": bbox_h,
-                            "contours": contours_data,
-                            "simplified": True,
-                            "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
-                        }
-                    )
-
-                    print(f"  Created detection: {class_name} ({confidence:.2f})")
-
+            if detections_to_persist:
                 await self.db.create_detections_batch(image_id, detections_to_persist)
 
             # Mark job as done
@@ -145,82 +113,6 @@ class Worker:
             traceback.print_exc()
             await self.db.mark_job_error(job_id, error_msg)
             return False
-
-    def _process_mask(
-        self, mask: np.ndarray, img_width: int, img_height: int, x1: int, y1: int, x2: int, y2: int
-    ) -> list:
-        """
-        Process a mask to extract polygon contours.
-
-        Uses the same V5 mask processing logic from api.py.
-        """
-        # Expand bbox slightly (5% each side)
-        bbox_margin = 0.05
-        bbox_w = x2 - x1
-        bbox_h = y2 - y1
-        x1 = max(0, int(x1 - bbox_w * bbox_margin))
-        y1 = max(0, int(y1 - bbox_h * bbox_margin))
-        x2 = min(img_width, int(x2 + bbox_w * bbox_margin))
-        y2 = min(img_height, int(y2 + bbox_h * bbox_margin))
-
-        # Step 1: Resize mask
-        mask_resized = cv2.resize(mask, (img_width, img_height), interpolation=cv2.INTER_LINEAR)
-
-        # Step 2: Apply bounding box constraint
-        bbox_mask = np.zeros_like(mask_resized)
-        bbox_mask[y1:y2, x1:x2] = 1.0
-        mask_resized = mask_resized * bbox_mask
-
-        # Step 3: High threshold (0.75)
-        mask_threshold = 0.75
-        mask_binary = (mask_resized > mask_threshold).astype(np.uint8) * 255
-
-        # Step 4: Morphological operations
-        kernel_size = max(5, int(min(img_width, img_height) * 0.01))
-        if kernel_size % 2 == 0:
-            kernel_size += 1
-
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-        mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_OPEN, kernel, iterations=2)
-        mask_binary = cv2.morphologyEx(mask_binary, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-        # Step 5: Gaussian blur
-        blur_size = max(3, kernel_size - 2)
-        if blur_size % 2 == 0:
-            blur_size += 1
-        mask_binary = cv2.GaussianBlur(mask_binary, (blur_size, blur_size), 0)
-
-        # Step 6: Final threshold
-        _, mask_binary = cv2.threshold(mask_binary, 127, 255, cv2.THRESH_BINARY)
-
-        # Step 7: Find contours
-        contours, _ = cv2.findContours(mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Step 8: Filter and simplify contours
-        if not contours:
-            return []
-
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        largest = contours[0]
-        largest_area = cv2.contourArea(largest)
-
-        min_ratio = 0.20
-        filtered = [largest]
-        for cnt in contours[1:]:
-            if cv2.contourArea(cnt) >= largest_area * min_ratio:
-                filtered.append(cnt)
-
-        # Douglas-Peucker approximation
-        smoothed_contours = []
-        for contour in filtered:
-            epsilon = 0.001 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, epsilon, True)
-            smoothed_contours.append(approx)
-
-        # Convert to JSON-serializable format
-        contours_data = [[{"x": int(p[0][0]), "y": int(p[0][1])} for p in contour] for contour in smoothed_contours]
-
-        return contours_data
 
     async def run(self, once: bool = False):
         """

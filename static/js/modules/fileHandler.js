@@ -61,6 +61,8 @@ export class FileHandler {
           file,
           status: "waiting",
           error: "",
+          remoteJobId: "",
+          imageId: "",
         }))
       );
     }
@@ -92,6 +94,22 @@ export class FileHandler {
     if (job) {
       job.status = "processing";
       job.error = "";
+    }
+  }
+
+  markQueued(id) {
+    const job = this.selectedFiles.find((item) => item.id === id);
+    if (job) {
+      job.status = "queued";
+      job.error = "";
+    }
+  }
+
+  attachRemoteJob(id, remoteJobId, imageId) {
+    const job = this.selectedFiles.find((item) => item.id === id);
+    if (job) {
+      job.remoteJobId = remoteJobId;
+      job.imageId = imageId;
     }
   }
 

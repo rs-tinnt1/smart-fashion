@@ -1,9 +1,8 @@
 # Smart Fashion - Makefile
 # Simplifies common development commands
 
-.PHONY: help install dev run test test-cov test-level1 test-level2 test-level3 test-level4 \
-        format lint fix docker-up docker-down docker-logs docker-build \
-        podman-up podman-down podman-logs podman-build clean
+.PHONY: help install dev run dev-app dev-worker test test-cov test-cov-html test-level1 test-level2 test-level3 test-level4 \
+        format lint fix docker-up docker-down docker-logs docker-build clean
 
 # Default target
 help:
@@ -13,13 +12,15 @@ help:
 	@echo "  make install        Install dependencies with Poetry"
 	@echo ""
 	@echo "Development:"
-	@echo "  make dev            Start dev server (poetry + uvicorn)"
+	@echo "  make dev            Start full local demo stack (app + worker + mysql)"
 	@echo "  make run            Alias for 'make dev'"
+	@echo "  make dev-app        Start only FastAPI app with uvicorn"
+	@echo "  make dev-worker     Start only background worker"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test           Run all tests"
-	@echo "  make test-cov       Run tests with coverage"
-	@echo "  make test-level1    Run infrastructure tests"
+	@echo "  make test-cov       Run tests with coverage report"
+	@echo "  make test-level1    Run local infrastructure/config tests"
 	@echo "  make test-level2    Run service tests"
 	@echo "  make test-level3    Run API tests"
 	@echo "  make test-level4    Run UI tests"
@@ -34,12 +35,6 @@ help:
 	@echo "  make docker-down    Stop docker-compose services"
 	@echo "  make docker-logs    Follow app logs"
 	@echo "  make docker-build   Rebuild and start app container"
-	@echo ""
-	@echo "Podman:"
-	@echo "  make podman-up      Start all services with podman-compose"
-	@echo "  make podman-down    Stop podman-compose services"
-	@echo "  make podman-logs    Follow app logs"
-	@echo "  make podman-build   Build image with podman"
 	@echo ""
 	@echo "Cleanup:"
 	@echo "  make clean          Remove cache and temp files"
@@ -56,19 +51,25 @@ install:
 # =============================================================================
 
 dev:
-	poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
+	docker compose -f compose.yml up --build
 
 run: dev
+
+dev-app:
+	poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+dev-worker:
+	poetry run python worker.py
 
 # =============================================================================
 # Testing
 # =============================================================================
 
 test:
-	poetry run pytest -v
+	poetry run pytest
 
 test-cov:
-	poetry run pytest --cov=app
+	poetry run pytest --cov=app --cov-report=term-missing
 
 test-cov-html:
 	poetry run pytest --cov=app --cov-report=html
@@ -112,23 +113,7 @@ docker-logs:
 	docker compose -f compose.yml logs -f app
 
 docker-build:
-	docker compose -f compose.yml up -d --build app
-
-# =============================================================================
-# Podman
-# =============================================================================
-
-podman-up:
-	podman-compose -f compose.yml up -d
-
-podman-down:
-	podman-compose -f compose.yml down
-
-podman-logs:
-	podman-compose -f compose.yml logs -f app
-
-podman-build:
-	podman build -t smartfashion:latest .
+	docker compose -f compose.yml up -d --build
 
 # =============================================================================
 # Cleanup

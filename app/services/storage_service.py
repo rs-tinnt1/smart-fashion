@@ -15,6 +15,7 @@ from botocore.exceptions import ClientError
 
 from app.config import (
     S3_ENDPOINT,
+    S3_PUBLIC_ENDPOINT,
     S3_ACCESS_KEY_ID,
     S3_SECRET_ACCESS_KEY,
     S3_BUCKET,
@@ -143,7 +144,7 @@ class StorageService:
         bucket = bucket_name or self.default_bucket
         try:
             response = self.client.get_object(Bucket=bucket, Key=object_name)
-            return response['Body'].read()
+            return response["Body"].read()
         except ClientError as e:
             print(f"Error downloading bytes: {e}")
             return None
@@ -183,12 +184,16 @@ class StorageService:
             request_host: Optional host from request header (not used for R2)
         """
         bucket = bucket_name or self.default_bucket
+
+        if S3_PUBLIC_ENDPOINT:
+            return f"{S3_PUBLIC_ENDPOINT.rstrip('/')}/{bucket}/{object_name}"
+
         # For R2 without a public custom domain, we must use presigned URLs
         # to ensure the browser can load the image without 403 Forbidden
         presigned_url = self.get_presigned_url(object_name, bucket)
         if presigned_url:
             return presigned_url
-        
+
         # Fallback to direct URL
         return f"{S3_ENDPOINT}/{bucket}/{object_name}"
 
