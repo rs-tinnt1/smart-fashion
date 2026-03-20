@@ -21,10 +21,10 @@ function createResultCard(result) {
   const objectsDetected = objects.length;
   const classes = [...new Set(objects.map((obj) => obj.class_name))];
   const previewUrl = result.preview_url || result.original_image_url || "";
-  const downloadUrl = result.original_image_url || result.preview_url || "";
-  const downloadButton = downloadUrl
-    ? `<a href="${downloadUrl}" download class="btn btn-primary flex-1 text-center text-sm">Download</a>`
-    : `<span class="btn btn-primary flex-1 text-center text-sm opacity-60 pointer-events-none">Stored Locally</span>`;
+  const detailUrl = result.file_id ? `/product/${result.file_id}` : "";
+  const detailButton = detailUrl
+    ? `<a href="${detailUrl}" class="btn btn-primary flex-1 text-center text-sm">View Details</a>`
+    : `<span class="btn btn-primary flex-1 text-center text-sm opacity-60 pointer-events-none">Unavailable</span>`;
 
   card.innerHTML = `
     <img src="${previewUrl}" alt="Segmented image" class="gallery-item__image">
@@ -37,7 +37,7 @@ function createResultCard(result) {
         ${classes.map((cls) => `<span class="tag">${cls}</span>`).join("")}
       </div>
       <div class="flex gap-3 mt-5">
-        ${downloadButton}
+        ${detailButton}
       </div>
     </div>
   `;
