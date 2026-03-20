@@ -1,7 +1,7 @@
-import sys
 import asyncio
+import sys
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from contextlib import asynccontextmanager
@@ -16,6 +16,7 @@ from app.config import APP_VERSION, MODEL_PRELOAD, STATIC_DIR, UVICORN_HOST, UVI
 from app.controllers.gallery_controller import router as gallery_router
 from app.controllers.segment_controller import router as api_router
 from app.controllers.upload_controller import router as upload_router
+from app.services.runtime_status import add_runtime_warning, initialize_runtime_state, set_runtime_component
 
 # Global model and services
 model = None
@@ -27,13 +28,15 @@ async def lifespan(application: FastAPI):
     """Application lifespan handler for startup and shutdown."""
     global model, storage_service
 
+    initialize_runtime_state(application)
+
     # Startup
     try:
         # Initialize S3/R2 storage service
         from app.services.storage_service import get_storage_service
 
         storage_service = get_storage_service()
-        storage_service.ensure_bucket_exists()
+        set_runtime_component(application, "storage", True, "client initialized")
 
         # Inject storage_service into segment_controller
         import app.controllers.segment_controller as segment_controller
@@ -41,27 +44,32 @@ async def lifespan(application: FastAPI):
         segment_controller.storage_service = storage_service
 
         if MODEL_PRELOAD:
-            # Load YOLO model (PyTorch .pt format) with fallback support
+            # Load YOLO model (PyTorch .pt format) when explicitly requested.
             from app.services.inference_service import load_best_segment_model
 
-            model, loaded_model_name = load_best_segment_model(storage_service)
-            print(f"YOLO model loaded successfully: {loaded_model_name}")
+            try:
+                model, loaded_model_name = load_best_segment_model(storage_service)
+                print(f"YOLO model loaded successfully: {loaded_model_name}")
 
-            # Inject model into controller
-            segment_controller.model = model
-            segment_controller.model_name = loaded_model_name
+                # Inject model into controller
+                segment_controller.model = model
+                segment_controller.model_name = loaded_model_name
+                set_runtime_component(application, "model", True, f"loaded: {loaded_model_name}")
+            except Exception as exc:
+                warning = f"Model preload failed; continuing with on-demand loading: {exc}"
+                print(warning)
+                add_runtime_warning(application, warning)
+                set_runtime_component(application, "model", False, str(exc))
         else:
             print("Skipping model preload at startup (MODEL_PRELOAD=false)")
+            set_runtime_component(application, "model", False, "deferred until first segmentation request")
 
-        # Initialize database connection pool
-        from app.services.database_service import get_database
-
-        await get_database()
-        print("Database connection pool initialized")
+        # Keep DB initialization lazy so Render health checks are not blocked by MySQL startup latency.
+        set_runtime_component(application, "database", False, "deferred until first database request")
 
     except Exception as e:
         print(f"Error during startup: {e}")
-        raise
+        add_runtime_warning(application, f"Startup degraded: {e}")
 
     yield  # Application runs here
 

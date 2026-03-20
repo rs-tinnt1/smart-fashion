@@ -1,22 +1,15 @@
-# Minimal web-only blueprint for synchronous segmentation.
-# Use `render.worker.yaml` if you also want the background upload worker.
+# Image-backed web blueprint for Render.
+# Replace the image URL with your published registry image.
 services:
   - type: web
-    runtime: docker
+    runtime: image
     name: smart-fashion
     plan: free
-    dockerfilePath: ./Dockerfile
-    buildFilter:
-      paths:
-        - app/**
-        - static/**
-        - templates/**
-        - Dockerfile
-        - main.py
-        - worker.py
-        - pyproject.toml
-        - poetry.lock
-        - render.yaml
+    image:
+      url: ghcr.io/your-org/smart-fashion:latest
+      # creds:
+      #   fromRegistryCreds:
+      #     name: ghcr-readonly
     healthCheckPath: /api/healthz
     envVars:
       - key: PORT

@@ -6,6 +6,7 @@ Provides async connection pool and CRUD operations using aiomysql.
 
 from __future__ import annotations
 
+import json
 import ssl
 import uuid
 from contextlib import asynccontextmanager
@@ -253,6 +254,117 @@ class DatabaseService:
         """
         await self.execute(query, (detection_id, image_id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h))
         return detection_id
+
+    async def _insert_detection_records(
+        self,
+        conn: aiomysql.Connection,
+        image_id: str,
+        detections: list[dict[str, Any]],
+    ) -> list[str]:
+        if not detections:
+            return []
+
+        detection_ids: list[str] = []
+        detection_rows: list[tuple[Any, ...]] = []
+        polygon_rows: list[tuple[Any, ...]] = []
+        embedding_rows: list[tuple[Any, ...]] = []
+
+        for detection in detections:
+            detection_id = str(uuid.uuid4())
+            detection_ids.append(detection_id)
+            detection_rows.append(
+                (
+                    detection_id,
+                    image_id,
+                    detection["label"],
+                    detection["confidence"],
+                    detection["bbox_x"],
+                    detection["bbox_y"],
+                    detection["bbox_w"],
+                    detection["bbox_h"],
+                )
+            )
+
+            contours = detection.get("contours") or []
+            if contours:
+                polygon_rows.append(
+                    (
+                        str(uuid.uuid4()),
+                        detection_id,
+                        json.dumps(contours),
+                        detection.get("simplified", True),
+                    )
+                )
+
+            embedding = detection.get("embedding")
+            if embedding:
+                embedding_rows.append(
+                    (
+                        str(uuid.uuid4()),
+                        detection_id,
+                        embedding["model_name"],
+                        json.dumps(embedding["vector"]),
+                    )
+                )
+
+        async with conn.cursor() as cur:
+            await cur.executemany(
+                """
+                INSERT INTO detections (id, image_id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                detection_rows,
+            )
+
+            if polygon_rows:
+                await cur.executemany(
+                    """
+                    INSERT INTO polygons (id, detection_id, points_json, simplified)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    polygon_rows,
+                )
+
+            if embedding_rows:
+                await cur.executemany(
+                    """
+                    INSERT INTO embeddings (id, detection_id, model_name, `vector`)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    embedding_rows,
+                )
+
+        return detection_ids
+
+    async def create_image_with_detections(
+        self,
+        image_id: str,
+        storage_url: str,
+        width: int = 0,
+        height: int = 0,
+        file_size: int = 0,
+        hash: str | None = None,
+        detections: list[dict[str, Any]] | None = None,
+    ) -> str:
+        """Create an image and persist all detections in a single transaction."""
+        async with self.transaction() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO images (id, storage_url, width, height, file_size, hash)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (image_id, storage_url, width, height, file_size, hash),
+                )
+
+            await self._insert_detection_records(conn, image_id, detections or [])
+
+        return image_id
+
+    async def create_detections_batch(self, image_id: str, detections: list[dict[str, Any]]) -> list[str]:
+        """Persist multiple detections, polygons, and embeddings in one transaction."""
+        async with self.transaction() as conn:
+            return await self._insert_detection_records(conn, image_id, detections)
 
     async def get_detection(self, detection_id: str) -> dict[str, Any] | None:
         """Get detection by ID with polygon and embedding."""

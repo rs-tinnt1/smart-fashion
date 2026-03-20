@@ -1,4 +1,5 @@
-# Web + worker blueprint for synchronous requests and queued uploads.
+# Image-backed web + worker blueprint for Render.
+# Replace the image URL with your published registry image.
 envVarGroups:
   - name: smart-fashion-shared
     envVars:
@@ -11,21 +12,14 @@ envVarGroups:
 
 services:
   - type: web
-    runtime: docker
+    runtime: image
     name: smart-fashion
     plan: free
-    dockerfilePath: ./Dockerfile
-    buildFilter:
-      paths:
-        - app/**
-        - static/**
-        - templates/**
-        - Dockerfile
-        - main.py
-        - worker.py
-        - pyproject.toml
-        - poetry.lock
-        - render.worker.yaml
+    image:
+      url: ghcr.io/your-org/smart-fashion:latest
+      # creds:
+      #   fromRegistryCreds:
+      #     name: ghcr-readonly
     healthCheckPath: /api/healthz
     envVars:
       - fromGroup: smart-fashion-shared
@@ -47,21 +41,14 @@ services:
         sync: false
 
   - type: worker
-    runtime: docker
+    runtime: image
     name: smart-fashion-worker
     plan: starter
-    dockerfilePath: ./Dockerfile
-    buildFilter:
-      paths:
-        - app/**
-        - static/**
-        - templates/**
-        - Dockerfile
-        - main.py
-        - worker.py
-        - pyproject.toml
-        - poetry.lock
-        - render.worker.yaml
+    image:
+      url: ghcr.io/your-org/smart-fashion:latest
+      # creds:
+      #   fromRegistryCreds:
+      #     name: ghcr-readonly
     dockerCommand: python worker.py
     envVars:
       - fromGroup: smart-fashion-shared

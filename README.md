@@ -43,6 +43,8 @@ poetry run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --workers 1
 
 Use `render.yaml` for the web service or `render.worker.yaml` for web + worker deployments. Configure `MODEL_PRELOAD=false` on constrained environments so the app can pass health checks before downloading the YOLO weights.
 
+If you want to avoid long Docker builds on Render, use the image-backed blueprints in `render.image.yaml` and `render.image.worker.yaml`. The repository now includes `.github/workflows/build-image.yml`, which publishes a `linux/amd64` image to GHCR and can optionally trigger Render deploy hooks via the `RENDER_WEBHOOK_URL` and `RENDER_WORKER_WEBHOOK_URL` secrets.
+
 ## 🛠️ Configuration (.env)
 
 | Variable | Default | Description |

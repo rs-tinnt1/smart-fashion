@@ -1,11 +1,14 @@
-import json
 from datetime import datetime
 from threading import Lock
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 
+from app.config import MODEL_PRELOAD
 from app.services.database_service import DatabaseService, get_database
+from app.services.runtime_status import add_runtime_warning, get_runtime_snapshot, set_runtime_component
 from app.services.segmentation_service import delete_output, get_stats, segment_one_file
 
 router = APIRouter()
@@ -16,13 +19,17 @@ storage_service = None  # Will be injected by main.py
 model_lock = Lock()
 
 
-def _load_model_on_demand() -> Any:
+def _load_model_on_demand(request: Request | None = None) -> Any:
     global model, model_name
 
     if model is not None:
+        if request is not None and model_name is not None:
+            set_runtime_component(request.app, "model", True, f"loaded: {model_name}")
         return model
 
     if storage_service is None:
+        if request is not None:
+            set_runtime_component(request.app, "storage", False, "storage service not initialized")
         raise HTTPException(status_code=503, detail="Storage service not initialized")
 
     with model_lock:
@@ -33,13 +40,18 @@ def _load_model_on_demand() -> Any:
             from app.services.inference_service import load_best_segment_model
 
             model, model_name = load_best_segment_model(storage_service)
+            if request is not None and model_name is not None:
+                set_runtime_component(request.app, "model", True, f"loaded on demand: {model_name}")
             return model
         except Exception as exc:
+            if request is not None:
+                set_runtime_component(request.app, "model", False, str(exc))
+                add_runtime_warning(request.app, f"On-demand model load failed: {exc}")
             raise HTTPException(status_code=503, detail=f"Model failed to initialize: {exc}") from exc
 
 
-def get_model():
-    return _load_model_on_demand()
+def get_model(request: Request):
+    return _load_model_on_demand(request)
 
 
 def get_storage():
@@ -49,9 +61,46 @@ def get_storage():
     return storage_service
 
 
-async def get_db() -> DatabaseService:
+async def get_db(request: Request) -> DatabaseService:
     """Dependency to get database service."""
-    return await get_database()
+    try:
+        db = await get_database()
+        set_runtime_component(request.app, "database", True, "connection pool initialized")
+        return db
+    except Exception as exc:
+        set_runtime_component(request.app, "database", False, str(exc))
+        add_runtime_warning(request.app, f"Database initialization failed: {exc}")
+        raise
+
+
+def _build_detection_record(obj: dict[str, Any]) -> dict[str, Any]:
+    bbox = obj.get("bbox") or {}
+    contours = obj.get("contours", [])
+
+    bbox_x = int(bbox.get("x", 0))
+    bbox_y = int(bbox.get("y", 0))
+    bbox_w = int(bbox.get("w", 0))
+    bbox_h = int(bbox.get("h", 0))
+
+    if (bbox_w <= 0 or bbox_h <= 0) and contours and contours[0]:
+        xs = [point["x"] for point in contours[0]]
+        ys = [point["y"] for point in contours[0]]
+        bbox_x = min(xs)
+        bbox_y = min(ys)
+        bbox_w = max(xs) - bbox_x
+        bbox_h = max(ys) - bbox_y
+
+    return {
+        "label": obj.get("class_name", "unknown"),
+        "confidence": float(obj.get("confidence", 0.0)),
+        "bbox_x": bbox_x,
+        "bbox_y": bbox_y,
+        "bbox_w": bbox_w,
+        "bbox_h": bbox_h,
+        "contours": contours,
+        "simplified": True,
+        "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
+    }
 
 
 UploadedFiles = Annotated[list[UploadFile], File(...)]
@@ -61,13 +110,74 @@ DatabaseDependency = Annotated[DatabaseService, Depends(get_db)]
 
 
 @router.get("/api/health")
-async def health_check():
+async def health_check(request: Request):
+    startup_status, startup_warnings = get_runtime_snapshot(request.app)
     return {
         "status": "healthy",
         "model_loaded": model is not None,
         "model_name": model_name,
+        "startup": startup_status,
+        "warnings": startup_warnings,
         "timestamp": datetime.now().isoformat(),
     }
+
+
+@router.get("/api/healthz")
+async def liveness_check(request: Request):
+    _, startup_warnings = get_runtime_snapshot(request.app)
+    return {
+        "status": "ok",
+        "warnings": len(startup_warnings),
+        "timestamp": datetime.now().isoformat(),
+    }
+
+
+@router.get("/api/readyz")
+async def readiness_check(request: Request):
+    checks: dict[str, dict[str, str | bool]] = {}
+
+    if storage_service is None:
+        checks["storage"] = {"ready": False, "detail": "storage service not initialized"}
+        set_runtime_component(request.app, "storage", False, "storage service not initialized")
+    else:
+        try:
+            bucket_ready = await run_in_threadpool(storage_service.ensure_bucket_exists)
+            storage_detail = "bucket reachable" if bucket_ready else "bucket not reachable"
+            checks["storage"] = {"ready": bucket_ready, "detail": storage_detail}
+            set_runtime_component(request.app, "storage", bucket_ready, storage_detail)
+        except Exception as exc:
+            checks["storage"] = {"ready": False, "detail": str(exc)}
+            set_runtime_component(request.app, "storage", False, str(exc))
+
+    try:
+        db = await get_database()
+        db_probe = await db.fetch_one("SELECT 1 AS ok")
+        database_ready = db_probe is not None and db_probe.get("ok") == 1
+        database_detail = "query succeeded" if database_ready else "query returned no result"
+        checks["database"] = {"ready": database_ready, "detail": database_detail}
+        set_runtime_component(request.app, "database", database_ready, database_detail)
+    except Exception as exc:
+        checks["database"] = {"ready": False, "detail": str(exc)}
+        set_runtime_component(request.app, "database", False, str(exc))
+
+    if model is not None:
+        model_detail = f"loaded: {model_name}" if model_name else "loaded"
+        checks["model"] = {"ready": True, "detail": model_detail}
+        set_runtime_component(request.app, "model", True, model_detail)
+    elif MODEL_PRELOAD:
+        checks["model"] = {"ready": False, "detail": "MODEL_PRELOAD=true but model is not loaded"}
+        set_runtime_component(request.app, "model", False, "MODEL_PRELOAD=true but model is not loaded")
+    else:
+        checks["model"] = {"ready": True, "detail": "lazy load enabled; first segmentation request will warm the model"}
+        set_runtime_component(request.app, "model", False, "deferred until first segmentation request")
+
+    ready = all(bool(check["ready"]) for check in checks.values())
+    response = {
+        "status": "ready" if ready else "not_ready",
+        "checks": checks,
+        "timestamp": datetime.now().isoformat(),
+    }
+    return JSONResponse(status_code=200 if ready else 503, content=response)
 
 
 @router.post("/api/segment")
@@ -113,57 +223,20 @@ async def segment_clothing(
             image_id = result["file_id"]
             segmentation_data = result.get("segmentation_data", {})
             objects = segmentation_data.get("objects", [])
+            detection_records = [_build_detection_record(obj) for obj in objects]
 
             # Create image record in database
             # Use original image key (not output image)
             storage_key = result.get("original_image_key", f"images/{image_id}.jpg")
-            await db.create_image(
+            await db.create_image_with_detections(
                 image_id=image_id,
                 storage_url=storage_key,
                 width=segmentation_data.get("image_width", 0),
                 height=segmentation_data.get("image_height", 0),
                 file_size=file_size,
                 hash=None,
+                detections=detection_records,
             )
-
-            # Save each detection
-            for obj in objects:
-                # Get bounding box from contours if available
-                bbox_x, bbox_y, bbox_w, bbox_h = 0, 0, 0, 0
-                contours = obj.get("contours", [])
-                if contours and len(contours) > 0 and len(contours[0]) > 0:
-                    # Calculate bounding box from contour points
-                    all_points = contours[0]
-                    if all_points:
-                        xs = [p["x"] for p in all_points]
-                        ys = [p["y"] for p in all_points]
-                        bbox_x = min(xs)
-                        bbox_y = min(ys)
-                        bbox_w = max(xs) - bbox_x
-                        bbox_h = max(ys) - bbox_y
-
-                # Create detection record
-                detection_id = await db.create_detection(
-                    image_id=image_id,
-                    label=obj.get("class_name", "unknown"),
-                    confidence=obj.get("confidence", 0.0),
-                    bbox_x=bbox_x,
-                    bbox_y=bbox_y,
-                    bbox_w=bbox_w,
-                    bbox_h=bbox_h,
-                )
-
-                # Create polygon record if contours exist
-                if contours:
-                    await db.create_polygon(
-                        detection_id=detection_id, points_json=json.dumps(contours), simplified=True
-                    )
-
-                # Create stub embedding (placeholder)
-                embedding_vector = [0.0] * 128
-                await db.create_embedding(
-                    detection_id=detection_id, model_name="placeholder", vector=json.dumps(embedding_vector)
-                )
 
             results.append(result)
         except HTTPException:

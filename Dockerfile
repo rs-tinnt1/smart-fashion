@@ -95,7 +95,7 @@ EXPOSE 8000
 
 # Health check with proper timeout
 HEALTHCHECK --interval=30s --timeout=10s --start-period=45s --retries=3 \
-    CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://localhost:{os.getenv('PORT', '8000')}/api/health\")" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f\"http://localhost:{os.getenv('PORT', '8000')}/api/healthz\")" || exit 1
 
 # Production command
 CMD ["sh", "-c", "/opt/venv/bin/uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-1} --no-access-log"]

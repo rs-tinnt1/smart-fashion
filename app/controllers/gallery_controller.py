@@ -5,6 +5,7 @@ Provides gallery page and API endpoints for viewing processed images.
 """
 
 import json
+from collections import defaultdict
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,20 +13,68 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.services.database_service import DatabaseService, get_database
+from app.services.runtime_status import add_runtime_warning, set_runtime_component
 from app.services.storage_service import get_storage_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 
-async def get_db() -> DatabaseService:
+async def get_db(request: Request) -> DatabaseService:
     """Dependency to get database service."""
-    return await get_database()
+    try:
+        db = await get_database()
+        set_runtime_component(request.app, "database", True, "connection pool initialized")
+        return db
+    except Exception as exc:
+        set_runtime_component(request.app, "database", False, str(exc))
+        add_runtime_warning(request.app, f"Database initialization failed: {exc}")
+        raise
 
 
 def get_storage():
     """Dependency to get storage service."""
     return get_storage_service()
+
+
+def _build_in_clause(values: list[str]) -> tuple[str, tuple[str, ...]]:
+    placeholders = ", ".join(["%s"] * len(values))
+    return placeholders, tuple(values)
+
+
+async def _fetch_labels_by_image(db: DatabaseService, image_ids: list[str]) -> dict[str, list[str]]:
+    if not image_ids:
+        return {}
+
+    placeholders, params = _build_in_clause(image_ids)
+    rows = await db.fetch_all(
+        f"SELECT image_id, label FROM detections WHERE image_id IN ({placeholders}) GROUP BY image_id, label ORDER BY label",
+        params,
+    )
+
+    labels_by_image: dict[str, list[str]] = {image_id: [] for image_id in image_ids}
+    for row in rows:
+        labels_by_image.setdefault(row["image_id"], []).append(row["label"])
+    return labels_by_image
+
+
+async def _fetch_detections_by_image(db: DatabaseService, image_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    if not image_ids:
+        return {}
+
+    placeholders, params = _build_in_clause(image_ids)
+    rows = await db.fetch_all(
+        f"""SELECT id, image_id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h
+             FROM detections
+             WHERE image_id IN ({placeholders})
+             ORDER BY image_id, confidence DESC""",
+        params,
+    )
+
+    detections_by_image: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        detections_by_image[row["image_id"]].append(row)
+    return dict(detections_by_image)
 
 
 DatabaseDependency = Annotated[DatabaseService, Depends(get_db)]
@@ -92,11 +141,12 @@ async def gallery(
     # Calculate pagination info
     total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
 
+    image_ids = [img["id"] for img in images_data]
+    labels_by_image = await _fetch_labels_by_image(db, image_ids)
+
     images = []
     for img in images_data:
-        # Get detection labels for this image
-        detections = await db.fetch_all("SELECT DISTINCT label FROM detections WHERE image_id = %s", (img["id"],))
-        class_names = [d["label"] for d in detections]
+        class_names = labels_by_image.get(img["id"], [])
 
         # Use original image URL (not output)
         original_url = storage.get_public_url(img["storage_url"], request_host=request.headers.get("host"))
@@ -212,14 +262,12 @@ async def api_gallery(
         (limit,),
     )
 
+    image_ids = [img["id"] for img in images_data]
+    detections_by_image = await _fetch_detections_by_image(db, image_ids)
+
     result = []
     for img in images_data:
-        # Get detections for this image
-        detections = await db.fetch_all(
-            """SELECT id, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h
-               FROM detections WHERE image_id = %s""",
-            (img["id"],),
-        )
+        detections = detections_by_image.get(img["id"], [])
 
         # Get public URLs
         original_url = storage.get_public_url(img["storage_url"], request_host=request.headers.get("host"))

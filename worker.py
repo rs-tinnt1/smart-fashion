@@ -6,10 +6,9 @@ Run: python worker.py [--once]
 """
 
 import asyncio
-import json
 import sys
 
-if sys.platform == 'win32':
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import traceback
@@ -43,7 +42,7 @@ class Worker:
         # Initialize storage service
         self.storage = get_storage_service()
 
-        # Download and load model with fallback support
+        # Download and load the configured model
         self.model, self.model_name = load_best_segment_model(self.storage)
         print(f"YOLO model loaded successfully: {self.model_name}")
 
@@ -100,6 +99,7 @@ class Worker:
                 confidences = results[0].boxes.conf.cpu().numpy()
                 boxes_xyxy = results[0].boxes.xyxy.cpu().numpy()
                 class_names = results[0].names
+                detections_to_persist = []
 
                 for i, mask in enumerate(masks):
                     # Get detection info
@@ -116,30 +116,23 @@ class Worker:
                     # Process mask to get contours
                     contours_data = self._process_mask(mask, img_width, img_height, x1, y1, x2, y2)
 
-                    # Create detection record
-                    detection_id = await self.db.create_detection(
-                        image_id=image_id,
-                        label=class_name,
-                        confidence=confidence,
-                        bbox_x=bbox_x,
-                        bbox_y=bbox_y,
-                        bbox_w=bbox_w,
-                        bbox_h=bbox_h,
-                    )
-
-                    # Create polygon record
-                    if contours_data:
-                        await self.db.create_polygon(
-                            detection_id=detection_id, points_json=json.dumps(contours_data), simplified=True
-                        )
-
-                    # Create stub embedding (placeholder - can integrate real embedding model later)
-                    embedding_vector = [0.0] * 128  # Placeholder 128-dim embedding
-                    await self.db.create_embedding(
-                        detection_id=detection_id, model_name="placeholder", vector=json.dumps(embedding_vector)
+                    detections_to_persist.append(
+                        {
+                            "label": class_name,
+                            "confidence": confidence,
+                            "bbox_x": bbox_x,
+                            "bbox_y": bbox_y,
+                            "bbox_w": bbox_w,
+                            "bbox_h": bbox_h,
+                            "contours": contours_data,
+                            "simplified": True,
+                            "embedding": {"model_name": "placeholder", "vector": [0.0] * 128},
+                        }
                     )
 
                     print(f"  Created detection: {class_name} ({confidence:.2f})")
+
+                await self.db.create_detections_batch(image_id, detections_to_persist)
 
             # Mark job as done
             await self.db.mark_job_done(job_id)
