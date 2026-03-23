@@ -64,6 +64,7 @@ The `develop` branch is intended for the full local demo flow: multi-image uploa
 - the compose stack starts local `mysql`, `minio`, `app`, and `worker` services automatically
 - MySQL loads `db/schema.sql` on first boot, and MinIO creates the `smartfashion` bucket for local object storage
 - local containers talk to MinIO via `http://minio:9000`, while the browser loads images through `S3_PUBLIC_ENDPOINT=http://localhost:9000`
+- local compose also sets `STATIC_CACHE_CONTROL=no-store, max-age=0` so browser JS/CSS updates are visible immediately during Podman/Docker development
 - if you want to keep using a hosted database or external object storage, set `DB_URL` and S3 variables before starting compose to override the local defaults
 - the home page uploads images immediately, then polls background jobs until the worker finishes them
 
@@ -77,6 +78,7 @@ The `develop` branch is intended for the full local demo flow: multi-image uploa
 | `DB_URL` | | Connection string for MySQL-compatible databases (e.g., local Docker or Aiven) |
 | `S3_ENDPOINT` | | S3-compatible endpoint (e.g., local MinIO or Cloudflare R2) |
 | `S3_PUBLIC_ENDPOINT` | | Browser-facing object storage endpoint for local/containerized setups |
+| `STATIC_CACHE_CONTROL` | | Optional cache header override for local static assets |
 | `S3_BUCKET` | | Bucket Name |
 | `S3_ACCESS_KEY_ID` / `SECRET` | | S3 Credentials |
 

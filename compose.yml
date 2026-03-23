@@ -97,6 +97,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:-smartfashion}
       - S3_REGION=${S3_REGION:-us-east-1}
       - MODEL_PRELOAD=${MODEL_PRELOAD:-false}
+      - STATIC_CACHE_CONTROL=${STATIC_CACHE_CONTROL:-no-store, max-age=0}
     networks:
       - smartfashion-network
     depends_on:
@@ -144,6 +145,7 @@ services:
       - S3_BUCKET=${S3_BUCKET:-smartfashion}
       - S3_REGION=${S3_REGION:-us-east-1}
       - MODEL_PRELOAD=${MODEL_PRELOAD:-false}
+      - STATIC_CACHE_CONTROL=${STATIC_CACHE_CONTROL:-no-store, max-age=0}
     command: python worker.py
     networks:
       - smartfashion-network

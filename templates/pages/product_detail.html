@@ -27,6 +27,18 @@
   overflow: hidden;
 }
 
+.detected-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .detected-items-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Radio button styling */
 input[type="radio"] {
   appearance: none;
@@ -160,12 +172,28 @@ input[type="radio"]:hover {
             <h3 class="text-xl font-medium text-charcoal mb-4">
               Detected Items
             </h3>
-            <div class="flex flex-wrap gap-2">
-              {% if classes %}
-              {% for cls in classes %}
-              <span class="tag fade-in-up tag-delay-{{ loop.index0 % 10 }}">
-                {{ cls }}
-              </span>
+            <div id="detectedItemsGrid" class="detected-items-grid">
+              {% if grouped_detections %}
+              {% for label, items in grouped_detections.items() %}
+              <article class="rounded-2xl border border-light bg-warm-white p-4 space-y-4 fade-in-up tag-delay-{{ loop.index0 % 10 }}">
+                <div>
+                  <div class="flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full shrink-0" style="background: {{ items[0].overlay_color }};"></span>
+                    <p class="text-sm font-semibold text-charcoal capitalize">{{ label }}</p>
+                  </div>
+                  <p class="text-xs text-fog mt-2">{{ items|length }} detected item{% if items|length > 1 %}s{% endif %}</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {% for item in items %}
+                  <div class="space-y-2">
+                    <p class="text-xs font-medium text-charcoal">Confidence {{ (item.confidence * 100)|round|int }}%</p>
+                    <div class="rounded-xl overflow-hidden border border-light bg-white aspect-[4/3] flex items-center justify-center">
+                      <img src="{{ item.crop_url }}" alt="{{ label }}" class="w-full h-full object-contain" loading="lazy">
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </article>
               {% endfor %}
               {% else %}
               <p class="text-fog">No items detected</p>

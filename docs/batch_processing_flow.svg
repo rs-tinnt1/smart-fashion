@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700">
+  <defs>
+    <style>
+      .bg { fill: #f8f9fa; }
+      .box { rx: 8px; ry: 8px; stroke-width: 2px; }
+      .client { fill: #e8f5e9; stroke: #4caf50; }
+      .api { fill: #e3f2fd; stroke: #2196f3; }
+      .db { fill: #f3e5f5; stroke: #9c27b0; }
+      .storage { fill: #fff3e0; stroke: #ff9800; }
+      .worker { fill: #ffebee; stroke: #f44336; }
+      .text-title { font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; fill: #333; }
+      .text-node { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; fill: #333; text-anchor: middle; }
+      .text-desc { font-family: Arial, sans-serif; font-size: 12px; fill: #666; text-anchor: middle; }
+      .text-label { font-family: Arial, sans-serif; font-size: 12px; fill: #444; background: white; }
+      .line { stroke: #666; stroke-width: 2px; marker-end: url(#arrow); fill: none; }
+      .line-dashed { stroke: #666; stroke-width: 2px; marker-end: url(#arrow); stroke-dasharray: 5,5; fill: none; }
+      .timeline { stroke: #ccc; stroke-width: 2px; stroke-dasharray: 4,4; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" class="bg" />
+  
+  <text x="450" y="40" class="text-title" text-anchor="middle">Smart Fashion - Batch Image Processing Flow</text>
+
+  <!-- Nodes -->
+  <!-- Client -->
+  <rect x="50" y="80" width="120" height="50" class="box client" />
+  <text x="110" y="105" class="text-node">Client App</text>
+  <text x="110" y="120" class="text-desc">(Web/Mobile)</text>
+  <line x1="110" y1="130" x2="110" y2="650" class="timeline" />
+
+  <!-- FastAPI -->
+  <rect x="250" y="80" width="120" height="50" class="box api" />
+  <text x="310" y="105" class="text-node">FastAPI Backend</text>
+  <text x="310" y="120" class="text-desc">(Upload Controller)</text>
+  <line x1="310" y1="130" x2="310" y2="650" class="timeline" />
+
+  <!-- Storage -->
+  <rect x="450" y="80" width="120" height="50" class="box storage" />
+  <text x="510" y="105" class="text-node">Object Storage</text>
+  <text x="510" y="120" class="text-desc">(S3 / MinIO / R2)</text>
+  <line x1="510" y1="130" x2="510" y2="650" class="timeline" />
+
+  <!-- Database -->
+  <rect x="650" y="80" width="120" height="50" class="box db" />
+  <text x="710" y="105" class="text-node">MySQL Database</text>
+  <text x="710" y="120" class="text-desc">(Images, Jobs, Detections)</text>
+  <line x1="710" y1="130" x2="710" y2="650" class="timeline" />
+
+  <!-- Worker -->
+  <rect x="850" y="80" width="120" height="50" class="box worker" transform="translate(-100, 0)" />
+  <text x="810" y="105" class="text-node">Background Worker</text>
+  <text x="810" y="120" class="text-desc">(YOLO Inference)</text>
+  <line x1="810" y1="130" x2="810" y2="650" class="timeline" />
+
+  <!-- Sequence Arrows -->
+  
+  <!-- 1. Upload -->
+  <line x1="110" y1="170" x2="300" y2="170" class="line" />
+  <rect x="150" y="152" width="110" height="16" fill="#f8f9fa"/>
+  <text x="205" y="165" class="text-label">1. POST /upload</text>
+
+  <!-- 2. Save Storage -->
+  <line x1="310" y1="210" x2="500" y2="210" class="line" />
+  <rect x="350" y="192" width="110" height="16" fill="#f8f9fa"/>
+  <text x="405" y="205" class="text-label">2. Upload image file</text>
+
+  <!-- 3. Insert DB -->
+  <line x1="310" y1="250" x2="700" y2="250" class="line" />
+  <rect x="420" y="232" width="180" height="16" fill="#f8f9fa"/>
+  <text x="510" y="245" class="text-label">3. Create image &amp; queued job record</text>
+
+  <!-- 4. Return Job ID -->
+  <line x1="300" y1="290" x2="110" y2="290" class="line-dashed" />
+  <rect x="150" y="272" width="100" height="16" fill="#f8f9fa"/>
+  <text x="200" y="285" class="text-label">4. Return job_id</text>
+
+  <!-- 5. Worker Polls -->
+  <line x1="810" y1="360" x2="720" y2="360" class="line" />
+  <rect x="730" y="342" width="70" height="16" fill="#f8f9fa"/>
+  <text x="765" y="355" class="text-label">5. Poll jobs</text>
+  <line x1="720" y1="390" x2="810" y2="390" class="line-dashed" />
+  <rect x="730" y="372" width="70" height="16" fill="#f8f9fa"/>
+  <text x="765" y="385" class="text-label">Returns job</text>
+
+  <!-- 6. Worker Downloads -->
+  <line x1="810" y1="430" x2="520" y2="430" class="line" />
+  <rect x="610" y="412" width="110" height="16" fill="#f8f9fa"/>
+  <text x="665" y="425" class="text-label">6. Download image</text>
+
+  <!-- 7. Model Inference -->
+  <path d="M 810 470 C 840 470, 840 500, 810 500" class="line" />
+  <rect x="825" y="477" width="60" height="16" fill="#f8f9fa"/>
+  <text x="855" y="490" class="text-label">7. YOLO</text>
+
+  <!-- 8. Worker Updates DB -->
+  <line x1="810" y1="540" x2="720" y2="540" class="line" />
+  <rect x="725" y="522" width="80" height="16" fill="#f8f9fa"/>
+  <text x="765" y="535" class="text-label">8. Save results</text>
+  
+  <line x1="810" y1="570" x2="720" y2="570" class="line" />
+  <rect x="725" y="552" width="80" height="16" fill="#f8f9fa"/>
+  <text x="765" y="565" class="text-label">9. Mark 'done'</text>
+
+  <!-- 10. Client Checks Status -->
+  <line x1="110" y1="610" x2="300" y2="610" class="line" />
+  <rect x="150" y="592" width="110" height="16" fill="#f8f9fa"/>
+  <text x="205" y="605" class="text-label">10. GET /jobs/{id}</text>
+
+  <line x1="310" y1="610" x2="700" y2="610" class="line" />
+  
+  <line x1="300" y1="640" x2="110" y2="640" class="line-dashed" />
+  <rect x="150" y="622" width="110" height="16" fill="#f8f9fa"/>
+  <text x="205" y="635" class="text-label">Status: 'done'</text>
+
+</svg>

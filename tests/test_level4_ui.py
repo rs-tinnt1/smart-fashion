@@ -67,3 +67,27 @@ class TestFrontendAssets:
         assert "View Details" in content
         assert "/product/${result.file_id}" in content
         assert "Download" not in content
+
+    def test_product_detail_template_has_detected_item_grid(self):
+        content = Path("templates/pages/product_detail.html").read_text(encoding="utf-8")
+        assert 'id="detectedItemsGrid"' in content
+        assert "{{ item.crop_url }}" in content
+        assert "Confidence {{ (item.confidence * 100)|round|int }}%" in content
+
+    def test_product_page_renders_polygon_crops(self):
+        content = Path("static/js/modules/productPage.js").read_text(encoding="utf-8")
+        assert "createPolygonCrop" in content
+        assert "groupedDetections" in content
+        assert "detectedItemsGrid" in content
+        assert "Polygon crop unavailable" in content
+
+    def test_product_canvas_uses_per_item_colors(self):
+        content = Path("static/js/modules/productCanvas.js").read_text(encoding="utf-8")
+        assert "OVERLAY_PALETTE" in content
+        assert "getDetectionColor" in content
+        assert "detection.overlay_color" in content
+
+    def test_main_uses_cache_control_static_files(self):
+        content = Path("main.py").read_text(encoding="utf-8")
+        assert "CacheControlledStaticFiles" in content
+        assert "STATIC_CACHE_CONTROL" in content

@@ -3,6 +3,19 @@
 import { TAG_COLORS } from "../utils/constants.js";
 import { CanvasRenderer } from "./canvasRenderer.js";
 
+const OVERLAY_PALETTE = [
+  "#F25F5C",
+  "#247BA0",
+  "#70C1B3",
+  "#FF9F1C",
+  "#7F5AF0",
+  "#2A9D8F",
+  "#E76F51",
+  "#3A86FF",
+  "#EF476F",
+  "#6A994E",
+];
+
 /**
  * ProductCanvas class - Extended canvas for product detail page
  */
@@ -11,6 +24,15 @@ export class ProductCanvas extends CanvasRenderer {
     super(canvasElement);
     this.detections = detectionsData;
     this.displayMode = "polygon";
+  }
+
+  getDetectionColor(detection, index = 0) {
+    return (
+      detection.overlay_color ||
+      OVERLAY_PALETTE[index % OVERLAY_PALETTE.length] ||
+      TAG_COLORS[detection.label] ||
+      "#999999"
+    );
   }
 
   /**
@@ -34,11 +56,11 @@ export class ProductCanvas extends CanvasRenderer {
 
     // Draw overlays based on mode
     if (this.displayMode !== "image" && this.detections.length > 0) {
-      this.detections.forEach((detection) => {
+      this.detections.forEach((detection, index) => {
         if (this.displayMode === "polygon") {
-          this.drawDetectionPolygon(detection);
+          this.drawDetectionPolygon(detection, index);
         } else if (this.displayMode === "rectangle") {
-          this.drawDetectionRectangle(detection);
+          this.drawDetectionRectangle(detection, index);
         }
       });
     }
@@ -48,10 +70,10 @@ export class ProductCanvas extends CanvasRenderer {
    * Draw detection with polygon overlay
    * @param {Object} detection - Detection object
    */
-  drawDetectionPolygon(detection) {
+  drawDetectionPolygon(detection, index) {
     if (!detection.polygon || !detection.polygon.points_json) return;
 
-    const color = TAG_COLORS[detection.label] || "#999999";
+    const color = this.getDetectionColor(detection, index);
     let points;
 
     // Parse points_json if it's a string
@@ -81,15 +103,15 @@ export class ProductCanvas extends CanvasRenderer {
    * Draw detection with rectangle overlay
    * @param {Object} detection - Detection object
    */
-  drawDetectionRectangle(detection) {
+  drawDetectionRectangle(detection, index) {
     const bbox = detection.bbox;
     if (!bbox) return;
 
-    const color = TAG_COLORS[detection.label] || "#999999";
+    const color = this.getDetectionColor(detection, index);
     const { x, y, w, h } = bbox;
 
     // Set fill style with transparency
-    this.ctx.fillStyle = color + "40"; // 25% transparency
+    this.ctx.fillStyle = color + "55";
     this.ctx.strokeStyle = color;
     this.ctx.lineWidth = 3;
 
@@ -112,9 +134,9 @@ export class ProductCanvas extends CanvasRenderer {
     if (!contour || contour.length === 0) return;
 
     // Set fill style with transparency
-    this.ctx.fillStyle = color + "60"; // 38% transparency
+    this.ctx.fillStyle = color + "66";
     this.ctx.strokeStyle = color;
-    this.ctx.lineWidth = 2;
+    this.ctx.lineWidth = 3;
 
     this.ctx.beginPath();
     this.ctx.moveTo(contour[0].x, contour[0].y);

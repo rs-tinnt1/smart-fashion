@@ -207,15 +207,45 @@ class TestGalleryEndpoint:
 
         product = test_client.get(f"/product/{result['file_id']}")
         detail = test_client.get(f"/api/gallery/{result['file_id']}")
+        asset = test_client.get(f"/api/gallery/{result['file_id']}/asset")
+        crop = test_client.get(f"/api/detections/{detail.json()['detections'][0]['id']}/crop")
 
         assert product.status_code == 200
         assert detail.status_code == 200
+        assert asset.status_code == 200
+        assert crop.status_code == 200
+        assert crop.headers["content-type"] == "image/png"
         assert detail.json()["id"] == result["file_id"]
         assert detail.json()["original_url"].startswith("https://example.test/")
+        assert f"/api/gallery/{result['file_id']}/asset" in product.text
+        assert "/api/detections/" in product.text
 
     def test_product_and_gallery_detail_404(self, test_client):
         assert test_client.get("/product/missing").status_code == 404
         assert test_client.get("/api/gallery/missing").status_code == 404
+        assert test_client.get("/api/detections/missing/crop").status_code == 404
+
+    def test_detection_crop_falls_back_to_bbox_when_polygon_missing(self, test_client, fake_db, fake_storage, test_image_bytes):
+        image_id = "img-bbox-only"
+        storage_key = "uploads/img-bbox-only.png"
+        fake_storage.objects[storage_key] = test_image_bytes
+        fake_db.images[image_id] = {
+            "id": image_id,
+            "storage_url": storage_key,
+            "width": 32,
+            "height": 32,
+            "file_size": len(test_image_bytes),
+            "hash": None,
+            "uploaded_at": datetime.utcnow(),
+        }
+        detection_id = awaitable_uuid(fake_db, image_id)
+        fake_db.polygons.pop(detection_id, None)
+
+        response = test_client.get(f"/api/detections/{detection_id}/crop")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content
 
     def test_gallery_gracefully_handles_missing_database(self, test_client, monkeypatch):
         async def broken_db(*args, **kwargs):

@@ -9,49 +9,11 @@ from fastapi.responses import JSONResponse
 from app.config import MODEL_PRELOAD
 from app.services.database_service import get_database
 from app.services.runtime_status import add_runtime_warning, get_runtime_snapshot, set_runtime_component
-from app.services.segmentation_service import delete_output, get_stats, segment_one_file
+from app.services.segmentation_service import delete_output, get_stats, segment_one_file, is_model_loaded, get_loaded_model_name
 
 router = APIRouter()
 
-model = None  # Will be injected by main.py
-model_name = None  # Will be injected by main.py
 storage_service = None  # Will be injected by main.py
-model_lock = Lock()
-
-
-def _load_model_on_demand(request: Request | None = None) -> Any:
-    global model, model_name
-
-    if model is not None:
-        if request is not None and model_name is not None:
-            set_runtime_component(request.app, "model", True, f"loaded: {model_name}")
-        return model
-
-    if storage_service is None:
-        if request is not None:
-            set_runtime_component(request.app, "storage", False, "storage service not initialized")
-        raise HTTPException(status_code=503, detail="Storage service not initialized")
-
-    with model_lock:
-        if model is not None:
-            return model
-
-        try:
-            from app.services.inference_service import load_best_segment_model
-
-            model, model_name = load_best_segment_model(storage_service)
-            if request is not None and model_name is not None:
-                set_runtime_component(request.app, "model", True, f"loaded on demand: {model_name}")
-            return model
-        except Exception as exc:
-            if request is not None:
-                set_runtime_component(request.app, "model", False, str(exc))
-                add_runtime_warning(request.app, f"On-demand model load failed: {exc}")
-            raise HTTPException(status_code=503, detail=f"Model failed to initialize: {exc}") from exc
-
-
-def get_model(request: Request):
-    return _load_model_on_demand(request)
 
 
 def get_storage():
@@ -103,7 +65,6 @@ def _build_detection_record(obj: dict[str, Any]) -> dict[str, Any]:
 
 
 UploadedFiles = Annotated[list[UploadFile], File(...)]
-LoadedModel = Annotated[Any, Depends(get_model)]
 StorageDependency = Annotated[Any, Depends(get_storage)]
 
 
@@ -112,8 +73,8 @@ async def health_check(request: Request):
     startup_status, startup_warnings = get_runtime_snapshot(request.app)
     return {
         "status": "healthy",
-        "model_loaded": model is not None,
-        "model_name": model_name,
+        "model_loaded": is_model_loaded(),
+        "model_name": get_loaded_model_name(),
         "startup": startup_status,
         "warnings": startup_warnings,
         "timestamp": datetime.now().isoformat(),
@@ -158,8 +119,9 @@ async def readiness_check(request: Request):
         checks["database"] = {"ready": False, "detail": f"optional for free profile: {exc}"}
         set_runtime_component(request.app, "database", False, str(exc))
 
-    if model is not None:
-        model_detail = f"loaded: {model_name}" if model_name else "loaded"
+    if is_model_loaded():
+        model_name_loaded = get_loaded_model_name()
+        model_detail = f"loaded: {model_name_loaded}" if model_name_loaded else "loaded"
         checks["model"] = {"ready": True, "detail": model_detail}
         set_runtime_component(request.app, "model", True, model_detail)
     elif MODEL_PRELOAD:
@@ -183,7 +145,6 @@ async def readiness_check(request: Request):
 async def segment_clothing(
     request: Request,
     files: UploadedFiles,
-    yolo_model: LoadedModel,
     storage: StorageDependency,
 ):
     if not files:
@@ -214,9 +175,9 @@ async def segment_clothing(
                 content,
                 filename,
                 content_type,
-                yolo_model,
                 storage,
                 request.headers.get("host"),
+                request.app,
             )
 
             if db is not None:

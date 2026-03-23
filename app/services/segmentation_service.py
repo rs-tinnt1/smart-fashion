@@ -4,6 +4,52 @@ from typing import Any
 
 import cv2
 import numpy as np
+import threading
+from app.config import MODEL_PRELOAD
+from app.services.inference_service import load_best_segment_model
+from app.services.runtime_status import set_runtime_component, add_runtime_warning
+
+_model = None
+_model_name = None
+_model_lock = threading.Lock()
+
+def get_loaded_model(storage_service, request_app=None) -> Any:
+    global _model, _model_name
+    if _model is not None:
+        return _model
+    
+    with _model_lock:
+        if _model is not None:
+            return _model
+        try:
+            _model, _model_name = load_best_segment_model(storage_service)
+            if request_app:
+                set_runtime_component(request_app, "model", True, f"loaded on demand: {_model_name}")
+            return _model
+        except Exception as exc:
+            if request_app:
+                set_runtime_component(request_app, "model", False, str(exc))
+                add_runtime_warning(request_app, f"On-demand model load failed: {exc}")
+            raise RuntimeError(f"Model failed to initialize: {exc}") from exc
+
+def preload_model(storage_service, request_app=None):
+    global _model, _model_name
+    try:
+        _model, _model_name = load_best_segment_model(storage_service)
+        if request_app:
+            set_runtime_component(request_app, "model", True, f"loaded: {_model_name}")
+        return _model, _model_name
+    except Exception as exc:
+        if request_app:
+            set_runtime_component(request_app, "model", False, str(exc))
+            add_runtime_warning(request_app, f"Model preload failed: {exc}")
+        raise
+
+def is_model_loaded() -> bool:
+    return _model is not None
+
+def get_loaded_model_name() -> str | None:
+    return _model_name
 
 
 def _contour_to_points(contour: Any) -> list[dict[str, int]]:
@@ -191,9 +237,9 @@ def segment_one_file(
     image_bytes: bytes,
     filename: str,
     content_type: str,
-    model: Any,
     storage_service: Any | None,
     request_host: str | None = None,
+    request_app: Any | None = None,
 ) -> dict[str, Any]:
     """Handle a single uploaded file – uploads ORIGINAL image & JSON to S3/R2 directly from memory.
 
@@ -201,14 +247,15 @@ def segment_one_file(
         image_bytes: Raw image bytes
         filename: Original filename
         content_type: MIME type of the upload
-        model: YOLO model for inference
         storage_service: S3/R2 storage service instance
         request_host: Request host header for dynamic URLs
+        request_app: FastAPI application instance for runtime warnings
     """
     if not content_type.startswith("image/"):
         raise ValueError(f"File {filename} is not an image")
 
     file_id = str(uuid.uuid4())
+    model = get_loaded_model(storage_service, request_app=request_app)
     result = _process_one_image(image_bytes, model)
 
     file_ext = filename.rsplit(".", 1)[-1] if "." in filename else "jpg"

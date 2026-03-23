@@ -6,10 +6,13 @@ Provides gallery page and API endpoints for viewing processed images.
 
 import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Annotated, Any
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.services.database_service import DatabaseService, get_database
@@ -18,6 +21,26 @@ from app.services.storage_service import get_storage_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
+
+MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
+OVERLAY_PALETTE = [
+    "#F25F5C",
+    "#247BA0",
+    "#70C1B3",
+    "#FF9F1C",
+    "#7F5AF0",
+    "#2A9D8F",
+    "#E76F51",
+    "#3A86FF",
+    "#EF476F",
+    "#6A994E",
+]
 
 
 async def get_db(request: Request) -> DatabaseService | None:
@@ -35,6 +58,74 @@ async def get_db(request: Request) -> DatabaseService | None:
 def get_storage():
     """Dependency to get storage service."""
     return get_storage_service()
+
+
+def _get_media_type_from_key(storage_key: str) -> str:
+    return MEDIA_TYPES.get(Path(storage_key).suffix.lower(), "application/octet-stream")
+
+
+def _parse_polygon_points(points_json: Any) -> list[list[dict[str, int]]]:
+    if not points_json:
+        return []
+    if isinstance(points_json, str):
+        try:
+            parsed = json.loads(points_json)
+        except json.JSONDecodeError:
+            return []
+        return parsed if isinstance(parsed, list) else []
+    return points_json if isinstance(points_json, list) else []
+
+
+def _build_polygon_crop(image_bytes: bytes, detection: dict[str, Any]) -> bytes | None:
+    image_array = np.frombuffer(image_bytes, np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image is None:
+        return None
+
+    polygon = detection.get("polygon")
+    polygon_points = _parse_polygon_points(polygon.get("points_json") if isinstance(polygon, dict) else None)
+    if polygon_points:
+        mask = np.zeros(image.shape[:2], dtype=np.uint8)
+        all_points: list[np.ndarray] = []
+
+        for contour in polygon_points:
+            if not contour:
+                continue
+            contour_array = np.array([[point["x"], point["y"]] for point in contour], dtype=np.int32)
+            if contour_array.size == 0:
+                continue
+            all_points.append(contour_array)
+            cv2.fillPoly(mask, [contour_array], 255)
+
+        if not all_points:
+            polygon_points = []
+        else:
+            stacked_points = np.vstack(all_points)
+            x, y, w, h = cv2.boundingRect(stacked_points)
+            masked = cv2.bitwise_and(image, image, mask=mask)
+            cropped = masked[y : y + h, x : x + w]
+            alpha = mask[y : y + h, x : x + w]
+            rgba = cv2.cvtColor(cropped, cv2.COLOR_BGR2BGRA)
+            rgba[:, :, 3] = alpha
+            ok, encoded = cv2.imencode(".png", rgba)
+            return encoded.tobytes() if ok else None
+
+    bbox = detection.get("bbox")
+    if isinstance(bbox, dict):
+        x = int(bbox.get("x", 0))
+        y = int(bbox.get("y", 0))
+        w = int(bbox.get("w", 0))
+        h = int(bbox.get("h", 0))
+    else:
+        x = int(detection.get("bbox_x", 0))
+        y = int(detection.get("bbox_y", 0))
+        w = int(detection.get("bbox_w", 0))
+        h = int(detection.get("bbox_h", 0))
+    if w <= 0 or h <= 0:
+        return None
+    cropped = image[y : y + h, x : x + w]
+    ok, encoded = cv2.imencode(".png", cropped)
+    return encoded.tobytes() if ok else None
 
 
 def _build_in_clause(values: list[str]) -> tuple[str, tuple[str, ...]]:
@@ -214,7 +305,8 @@ async def product_detail(
                   p.points_json, p.simplified
            FROM detections d
            LEFT JOIN polygons p ON p.detection_id = d.id
-           WHERE d.image_id = %s""",
+           WHERE d.image_id = %s
+           ORDER BY d.confidence DESC, d.id ASC""",
         (image_id,),
     )
 
@@ -224,12 +316,16 @@ async def product_detail(
 
     # Format detections data for frontend
     detections_data = []
-    for d in detections_raw:
+    grouped_detections: dict[str, list[dict[str, Any]]] = defaultdict(list)
+
+    for index, d in enumerate(detections_raw):
+        overlay_color = OVERLAY_PALETTE[index % len(OVERLAY_PALETTE)]
         detection = {
             "id": d["id"],
             "label": d["label"],
             "confidence": d["confidence"],
             "bbox": {"x": d["bbox_x"], "y": d["bbox_y"], "w": d["bbox_w"], "h": d["bbox_h"]},
+            "overlay_color": overlay_color,
         }
 
         # Add polygon data if available
@@ -237,9 +333,17 @@ async def product_detail(
             detection["polygon"] = {"points_json": d["points_json"], "simplified": d["simplified"]}
 
         detections_data.append(detection)
+        grouped_detections[d["label"]].append(
+            {
+                "id": d["id"],
+                "confidence": d["confidence"],
+                "overlay_color": overlay_color,
+                "crop_url": f"/api/detections/{d['id']}/crop",
+            }
+        )
 
-    # Get original image URL (not output)
-    original_url = storage.get_public_url(image["storage_url"], request_host=request.headers.get("host"))
+    # Use same-origin proxy URL so canvas-based polygon crops work in local environments.
+    original_url = f"/api/gallery/{image_id}/asset"
 
     return templates.TemplateResponse(
         "pages/product_detail.html",
@@ -251,10 +355,51 @@ async def product_detail(
             "image_height": image["height"],
             "object_count": object_count,
             "classes": class_names,
+            "grouped_detections": dict(grouped_detections),
             "detections_json": json.dumps(detections_data),  # JSON string for JavaScript
             "timestamp": image["uploaded_at"].strftime("%Y-%m-%d %H:%M:%S") if image["uploaded_at"] else "",
         },
     )
+
+
+@router.get("/api/gallery/{image_id}/asset")
+async def gallery_image_asset(image_id: str, db: DatabaseDependency, storage: StorageDependency):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Gallery is unavailable on the free profile")
+
+    image = await db.get_image(image_id)
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_bytes = storage.download_bytes(image["storage_url"])
+    if image_bytes is None:
+        raise HTTPException(status_code=404, detail="Image asset not found")
+
+    return Response(content=image_bytes, media_type=_get_media_type_from_key(image["storage_url"]))
+
+
+@router.get("/api/detections/{detection_id}/crop")
+async def detection_crop_asset(detection_id: str, db: DatabaseDependency, storage: StorageDependency):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Gallery is unavailable on the free profile")
+
+    detection = await db.get_detection(detection_id)
+    if not detection:
+        raise HTTPException(status_code=404, detail="Detection not found")
+
+    image = await db.get_image(detection["image_id"])
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_bytes = storage.download_bytes(image["storage_url"])
+    if image_bytes is None:
+        raise HTTPException(status_code=404, detail="Image asset not found")
+
+    crop_bytes = _build_polygon_crop(image_bytes, detection)
+    if crop_bytes is None:
+        raise HTTPException(status_code=404, detail="Crop asset not available")
+
+    return Response(content=crop_bytes, media_type="image/png")
 
 
 @router.get("/api/gallery")

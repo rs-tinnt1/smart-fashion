@@ -44,6 +44,7 @@ UVICORN_PORT = _get_int_env("PORT", "UVICORN_PORT", default=8000)
 UVICORN_WORKERS = _get_int_env("UVICORN_WORKERS", default=1)
 
 STATIC_DIR = Path("static")
+STATIC_CACHE_CONTROL = _get_env("STATIC_CACHE_CONTROL", default="")
 
 # DB settings (MySQL-compatible) - parse from connection string
 DB_URL = _get_env(

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.config import APP_VERSION, MODEL_PRELOAD, STATIC_DIR, UVICORN_HOST, UVICORN_PORT
+from app.config import APP_VERSION, MODEL_PRELOAD, STATIC_CACHE_CONTROL, STATIC_DIR, UVICORN_HOST, UVICORN_PORT
 from app.controllers.gallery_controller import router as gallery_router
 from app.controllers.segment_controller import router as api_router
 from app.controllers.upload_controller import router as upload_router
@@ -45,21 +45,15 @@ async def lifespan(application: FastAPI):
 
         if MODEL_PRELOAD:
             # Load YOLO model (PyTorch .pt format) when explicitly requested.
-            from app.services.inference_service import load_best_segment_model
+            from app.services.segmentation_service import preload_model
 
             try:
-                model, loaded_model_name = load_best_segment_model(storage_service)
+                _, loaded_model_name = preload_model(storage_service, application)
                 print(f"YOLO model loaded successfully: {loaded_model_name}")
-
-                # Inject model into controller
-                segment_controller.model = model
-                segment_controller.model_name = loaded_model_name
-                set_runtime_component(application, "model", True, f"loaded: {loaded_model_name}")
             except Exception as exc:
                 warning = f"Model preload failed; continuing with on-demand loading: {exc}"
                 print(warning)
-                add_runtime_warning(application, warning)
-                set_runtime_component(application, "model", False, str(exc))
+                # Warning and component state are already set in preload_model
         else:
             print("Skipping model preload at startup (MODEL_PRELOAD=false)")
             set_runtime_component(application, "model", False, "deferred until first segmentation request")
@@ -98,10 +92,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+class CacheControlledStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        if STATIC_CACHE_CONTROL:
+            response.headers["Cache-Control"] = STATIC_CACHE_CONTROL
+        return response
+
+
 STATIC_DIR.mkdir(exist_ok=True)
 
 if Path("static").exists():
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/static", CacheControlledStaticFiles(directory="static"), name="static")
 
 templates = Jinja2Templates(directory="templates")
 templates.env.globals.update(APP_VERSION=APP_VERSION)

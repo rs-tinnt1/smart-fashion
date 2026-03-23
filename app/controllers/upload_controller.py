@@ -63,7 +63,7 @@ async def upload_image(file: UploadedImage, db: DatabaseDependency, storage: Sto
     file_size = len(content)
 
     # Validate file size (max 500KB)
-    max_file_size_kb = 1024
+    max_file_size_kb = 500
     max_file_size_bytes = max_file_size_kb * 1024
     if file_size > max_file_size_bytes:
         raise HTTPException(
